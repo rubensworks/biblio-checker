@@ -1,6 +1,7 @@
 import type { IBiblioRecord } from './biblio';
 import type { IPublication } from './publication';
 import { normalizeTitle, titleSimilarity } from './similarity';
+import type { PublicationStatus } from './work';
 
 /**
  * Scores at or above this are treated as the same publication.
@@ -56,6 +57,10 @@ export interface IMatch {
    * A record found by title anywhere in the bibliography, not linked to the author.
    */
   unlinked?: IBiblioRecord;
+  /**
+   * Whether the publication reached a publisher, once that has been looked up.
+   */
+  publicationStatus?: PublicationStatus;
 }
 
 /**

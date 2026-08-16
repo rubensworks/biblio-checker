@@ -138,6 +138,13 @@ function renderMatch(match: IMatch, context: IRenderContext): HTMLElement {
     item.append(notice);
   }
 
+  if (match.publicationStatus === 'unknown') {
+    item.append(element('div', {
+      className: 'notice notice--warning',
+      text: 'Could not check whether a publisher version exists, so this may still be a preprint.',
+    }));
+  }
+
   if (match.status === 'review' && match.candidate) {
     const notice = element('div', { className: 'notice' });
     notice.append(element('span', { text: `Closest biblio record (${Math.round(match.score * 100)}% similar): ` }));
@@ -230,6 +237,40 @@ function renderStat(value: number, label: string, modifier: string): HTMLElement
 }
 
 /**
+ * Count the publications across a list of groups.
+ *
+ * @param groups The groups to count.
+ * @returns The total number of publications.
+ */
+function countIn(groups: IAuthorGroup[]): number {
+  return groups.reduce((sum, group): number => sum + group.matches.length, 0);
+}
+
+/**
+ * Render a collapsed section holding a secondary list of publications.
+ *
+ * @param groups The groups to render.
+ * @param context The render context.
+ * @param summary The label on the button that expands the section.
+ * @param intro An explanation shown once expanded.
+ * @param heading The heading to use in copied output.
+ * @returns The collapsed section.
+ */
+function renderCollapsedGroups(
+  groups: IAuthorGroup[],
+  context: IRenderContext,
+  summary: string,
+  intro: string,
+  heading: string,
+): HTMLElement {
+  const details = element('details', { className: 'secondary' });
+  details.append(element('summary', { text: summary }));
+  details.append(element('p', { className: 'section-intro', text: intro }));
+  details.append(renderGroups(groups, context, heading));
+  return details;
+}
+
+/**
  * Render the outcome of a check into a container.
  *
  * @param container The element to render into, which is emptied first.
@@ -239,39 +280,52 @@ function renderStat(value: number, label: string, modifier: string): HTMLElement
 export function renderResult(container: HTMLElement, result: ICheckResult, context: IRenderContext): void {
   container.replaceChildren();
 
-  const missingCount = result.missingGroups.reduce((sum, group): number => sum + group.matches.length, 0);
-  const reviewCount = result.reviewGroups.reduce((sum, group): number => sum + group.matches.length, 0);
+  const missingCount = countIn(result.missingGroups);
+  const preprintCount = countIn(result.preprintGroups);
+  const reviewCount = countIn(result.reviewGroups);
 
   const stats = element('div', { className: 'stats' });
-  stats.append(renderStat(missingCount, 'missing from biblio', 'missing'));
+  stats.append(renderStat(missingCount, 'published, missing from biblio', 'missing'));
   stats.append(renderStat(result.presentCount, 'already in biblio', 'present'));
+  stats.append(renderStat(preprintCount, 'preprint only', 'preprint'));
   stats.append(renderStat(reviewCount, 'need a closer look', 'review'));
   container.append(stats);
 
   if (missingCount === 0) {
     container.append(element('p', {
       className: 'empty',
-      text: 'Nothing to add: every publication in your bibliography is already in biblio.',
+      text: preprintCount > 0 ?
+        'Nothing to add right now: everything that reached a publisher is already in biblio.' :
+        'Nothing to add: every publication in your bibliography is already in biblio.',
     }));
   } else {
     container.append(element('h2', { text: 'Missing from biblio' }));
     container.append(element('p', {
       className: 'section-intro',
-      text: 'Grouped by first author, newest first. Use the copy buttons to paste a ready-made list into an email.',
+      text: 'Published at a conference or journal, grouped by first author, newest first. ' +
+        'Use the copy buttons to paste a ready-made list into an email.',
     }));
     container.append(renderGroups(result.missingGroups, context, context.heading));
   }
 
+  if (preprintCount > 0) {
+    container.append(renderCollapsedGroups(
+      result.preprintGroups,
+      context,
+      `${preprintCount} publication${preprintCount === 1 ? '' : 's'} with only a preprint`,
+      'No publisher version of these could be found in OpenAlex or Crossref, so they are probably not ready ' +
+        'for biblio yet. They will move up once their proceedings or issue appears.',
+      'Not published yet, so not in biblio either',
+    ));
+  }
+
   if (reviewCount > 0) {
-    const details = element('details', { className: 'review' });
-    details.append(element('summary', {
-      text: `${reviewCount} publication${reviewCount === 1 ? '' : 's'} that may or may not be in biblio`,
-    }));
-    details.append(element('p', {
-      className: 'section-intro',
-      text: 'These resemble an existing biblio record, but not closely enough to be sure. Check them manually.',
-    }));
-    details.append(renderGroups(result.reviewGroups, context, 'Possibly missing from biblio'));
-    container.append(details);
+    container.append(renderCollapsedGroups(
+      result.reviewGroups,
+      context,
+      `${reviewCount} publication${reviewCount === 1 ? '' : 's'} that may or may not be in biblio`,
+      'These resemble an existing biblio record, but not closely enough to be sure. Check them manually.',
+      'Possibly missing from biblio',
+    ));
   }
 }

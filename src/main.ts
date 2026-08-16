@@ -12,7 +12,7 @@ const DEFAULTS: ICheckOptions = {
   bibtexUrl: 'https://raw.githubusercontent.com/rubensworks/rubensworks.net/refs/heads/master/_bibliography/references.bib',
   biblioQuery: 'ugent_id:802001410273',
   deepCheck: true,
-  lookupDois: true,
+  checkPublishers: true,
 };
 
 /**
@@ -24,7 +24,7 @@ const form = requireElement<HTMLFormElement>('settings');
 const bibtexUrlInput = requireElement<HTMLInputElement>('bibtex-url');
 const biblioQueryInput = requireElement<HTMLInputElement>('biblio-query');
 const deepCheckInput = requireElement<HTMLInputElement>('deep-check');
-const lookupDoisInput = requireElement<HTMLInputElement>('lookup-dois');
+const checkPublishersInput = requireElement<HTMLInputElement>('check-publishers');
 const submitButton = requireElement<HTMLButtonElement>('check');
 const statusElement = requireElement<HTMLParagraphElement>('status');
 const resultsElement = requireElement<HTMLElement>('results');
@@ -39,7 +39,7 @@ function readOptions(): ICheckOptions {
     bibtexUrl: bibtexUrlInput.value.trim() || DEFAULTS.bibtexUrl,
     biblioQuery: biblioQueryInput.value.trim() || DEFAULTS.biblioQuery,
     deepCheck: deepCheckInput.checked,
-    lookupDois: lookupDoisInput.checked,
+    checkPublishers: checkPublishersInput.checked,
   };
 }
 
@@ -52,7 +52,7 @@ function applyOptions(options: ICheckOptions): void {
   bibtexUrlInput.value = options.bibtexUrl;
   biblioQueryInput.value = options.biblioQuery;
   deepCheckInput.checked = options.deepCheck;
-  lookupDoisInput.checked = options.lookupDois;
+  checkPublishersInput.checked = options.checkPublishers;
 }
 
 /**
@@ -111,7 +111,14 @@ async function runCheck(): Promise<void> {
         resolveLinks(publication, result.discoveredDois[publication.key]),
       heading: 'Publications still missing from the UGent Academic Bibliography',
     });
-    setStatus(`Checked ${result.matches.length} publications against ${result.records.length} biblio records.`);
+    const unreachable = result.unreachableSources.length > 0 ?
+      ` ${result.unreachableSources.join(' and ')} could not be reached, so some publications may be ` +
+      'classified from the bibliography alone.' :
+      '';
+    setStatus(
+      `Checked ${result.matches.length} publications against ${result.records.length} biblio records.${unreachable}`,
+      result.unreachableSources.length > 0 ? 'warning' : '',
+    );
   } catch (error: unknown) {
     setStatus(error instanceof Error ? error.message : String(error), 'error');
   } finally {

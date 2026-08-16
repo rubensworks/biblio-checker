@@ -1,5 +1,4 @@
 import { buildBiblioUrl, fetchAllBiblioRecords, searchBiblioByTitle, searchBiblioPage } from '../src/lib/biblio';
-import { lookupDoi } from '../src/lib/crossref';
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return <Response> <unknown> {
@@ -96,35 +95,5 @@ describe('searchBiblioByTitle', () => {
 
     await expect(searchBiblioByTitle('   ', <typeof fetch> <unknown> fetcher)).resolves.toEqual([]);
     expect(fetcher).not.toHaveBeenCalled();
-  });
-});
-
-describe('lookupDoi', () => {
-  it('accepts a result whose title matches', async() => {
-    const fetcher = jest.fn().mockResolvedValue(jsonResponse({
-      message: { items: [
-        { DOI: '10.1000/wrong', title: [ 'Something completely different' ]},
-        { DOI: '10.1000/right', title: [ 'Client-Driven Offline-First RDF 1.2 Using OR-Sets' ]},
-      ]},
-    }));
-
-    const title = 'Client-Driven Offline-First RDF 1.2 using OR-Sets';
-
-    await expect(lookupDoi(title, 'Doe', <typeof fetch> <unknown> fetcher)).resolves.toBe('10.1000/right');
-  });
-
-  it('rejects results that only look related', async() => {
-    const fetcher = jest.fn().mockResolvedValue(jsonResponse({
-      message: { items: [{ DOI: '10.1000/x', title: [ 'Improving Linked Data Development Experience with LDkit' ]}]},
-    }));
-
-    await expect(lookupDoi('RDF Test Suite: Improving Developer Experience', '', <typeof fetch> <unknown> fetcher))
-      .resolves.toBe('');
-  });
-
-  it('returns nothing on an error response', async() => {
-    const fetcher = jest.fn().mockResolvedValue(jsonResponse({}, false, 500));
-
-    await expect(lookupDoi('A title', '', <typeof fetch> <unknown> fetcher)).resolves.toBe('');
   });
 });
