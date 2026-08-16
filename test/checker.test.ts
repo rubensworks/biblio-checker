@@ -21,6 +21,13 @@ const BIBTEX = `@inproceedings{present_2020,
   booktitle = {Proceedings of Future Things},
   year      = {2026},
   url       = {https://example.github.io/paper/},
+}
+
+@inproceedings{review_2023,
+  author    = {Doe, Jane},
+  title     = {Guided Link-Traversal-Based Query Processing},
+  booktitle = {Proceedings of Borderline Things},
+  year      = {2023},
 }`;
 
 const OPTIONS: ICheckOptions = {
@@ -30,7 +37,43 @@ const OPTIONS: ICheckOptions = {
   checkPublishers: false,
 };
 
-const BIBLIO = { total: 1, hits: [{ _id: 'ID1', title: 'A title that is already there', year: '2020' }]};
+const BIBLIO = {
+  total: 2,
+  hits: [
+    { _id: 'ID1', title: 'A title that is already there', year: '2020' },
+    {
+      _id: 'ID3',
+      title: 'How does the link queue evolve during traversal-based query processing',
+      year: '2023',
+    },
+  ],
+};
+
+/**
+ * Collect the URLs a mock fetcher was called with.
+ *
+ * @param fetcher The mock fetcher that was passed to the check.
+ * @returns Every requested URL.
+ */
+function urlsOf(fetcher: typeof fetch): string[] {
+  return (<jest.Mock> <unknown> fetcher).mock.calls.map((call): string => <string> call[0]);
+}
+
+/**
+ * Collect the titles that were looked up in an external database.
+ *
+ * @param fetcher The mock fetcher that was passed to the check.
+ * @returns The decoded query of every OpenAlex and Crossref request.
+ */
+function lookedUpTitles(fetcher: typeof fetch): string[] {
+  return urlsOf(fetcher)
+    .filter((url): boolean => url.includes('openalex') || url.includes('crossref'))
+    .map((url): string => {
+      const parameters = new URL(url).searchParams;
+      return parameters.get('filter')?.replace('title.search:', '') ??
+        parameters.get('query.bibliographic') ?? '';
+    });
+}
 
 const OPENALEX_HIT = {
   results: [{
@@ -68,12 +111,13 @@ function fetcherFor(overrides: { openalex?: unknown; crossref?: unknown; failOpe
 }
 
 describe('check', () => {
-  it('separates missing from present publications', async() => {
+  it('separates missing, present and uncertain publications', async() => {
     const result = await check(OPTIONS, undefined, fetcherFor());
 
     expect(result.presentCount).toBe(1);
     expect(result.missingGroups).toHaveLength(2);
-    expect(result.reviewGroups).toEqual([]);
+    expect(result.reviewGroups).toHaveLength(1);
+    expect(result.reviewGroups[0].matches[0].publication.key).toBe('review_2023');
   });
 
   it('leaves everything in the main list when publishers are not checked', async() => {
@@ -117,6 +161,56 @@ describe('check', () => {
     expect(result.discoveredDois).toEqual({ published_2024: '10.1000/found' });
   });
 
+  it('only looks up publications that are really missing from biblio', async() => {
+    const fetcher = fetcherFor();
+
+    const result = await check({ ...OPTIONS, checkPublishers: true }, undefined, fetcher);
+
+    expect(result.presentCount).toBe(1);
+    expect(result.reviewGroups).toHaveLength(1);
+    expect(lookedUpTitles(fetcher).sort()).toEqual([
+      'Client-Driven Offline-First RDF 1.2 using OR-Sets',
+      'Something that only exists as a preprint',
+      'Something that only exists as a preprint',
+    ]);
+  });
+
+  it('never looks up a publication that is already in biblio', async() => {
+    const fetcher = fetcherFor();
+
+    await check({ ...OPTIONS, checkPublishers: true }, undefined, fetcher);
+
+    expect(lookedUpTitles(fetcher)).not.toContain('A title that is already there');
+  });
+
+  it('never looks up a publication whose biblio match is only uncertain', async() => {
+    const fetcher = fetcherFor();
+
+    await check({ ...OPTIONS, checkPublishers: true }, undefined, fetcher);
+
+    expect(lookedUpTitles(fetcher)).not.toContain('Guided Link-Traversal-Based Query Processing');
+  });
+
+  it('never looks up a publication the deep check found under another author', async() => {
+    const fetcher = <typeof fetch> <unknown> jest.fn(async(url: string): Promise<unknown> => {
+      if (url.endsWith('.bib')) {
+        return { ok: true, status: 200, text: async(): Promise<string> => BIBTEX };
+      }
+      if (url.includes('openalex') || url.includes('crossref')) {
+        return { ok: true, status: 200, json: async(): Promise<unknown> => ({ results: [], message: { items: []}}) };
+      }
+      const isTitleSearch = url.includes(encodeURIComponent('"'));
+      const body = isTitleSearch && url.includes('OR-Sets') ?
+          { total: 1, hits: [{ _id: 'ID2', title: 'Client-Driven Offline-First RDF 1.2 Using OR-Sets' }]} :
+        BIBLIO;
+      return { ok: true, status: 200, json: async(): Promise<unknown> => body };
+    });
+
+    await check({ ...OPTIONS, deepCheck: true, checkPublishers: true }, undefined, fetcher);
+
+    expect(lookedUpTitles(fetcher)).not.toContain('Client-Driven Offline-First RDF 1.2 using OR-Sets');
+  });
+
   it('reports no unreachable sources on a clean run', async() => {
     const result = await check({ ...OPTIONS, checkPublishers: true }, undefined, fetcherFor());
 
@@ -129,7 +223,7 @@ describe('check', () => {
     await check(OPTIONS, progress, fetcherFor());
 
     expect(progress).toHaveBeenCalledWith('Downloading bibliography…');
-    expect(progress).toHaveBeenCalledWith('Found 3 publications, querying biblio.ugent.be…');
+    expect(progress).toHaveBeenCalledWith('Found 4 publications, querying biblio.ugent.be…');
   });
 
   it('flags a missing publication that exists in biblio without being linked', async() => {
