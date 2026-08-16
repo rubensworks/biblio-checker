@@ -6,7 +6,8 @@ Lists which publications from a BibTeX bibliography are **not** in the
 [UGent Academic Bibliography](https://biblio.ugent.be/) yet, grouped by first author,
 so you know exactly what still needs to be registered and who to chase for it.
 
-Everything runs in the browser: no backend, no API key, nothing is stored anywhere but your own browser.
+Everything runs in the browser: no backend, and nothing is stored anywhere but your own browser. The settings
+live in the URL fragment, so any view can be bookmarked.
 
 ![Screenshot of Biblio Checker](docs/screenshot.png)
 
@@ -38,6 +39,30 @@ keeps the links clickable, while plain text editors get a readable fallback.
 * **Copy all** — the full list, with a heading and all groups.
 * **Copy group** — one author's publications, for a mail to that specific co-author.
 * **Copy** — a single publication.
+
+### Bookmarking a view
+
+The settings live in the URL fragment, so bookmarking the page keeps them:
+
+```
+https://rubensworks.github.io/biblio-checker/#bib=https%3A%2F%2Fexample.org%2Frefs.bib&q=ugent_id%3A802001410273&deep=0
+```
+
+| Parameter | Setting |
+| --- | --- |
+| `bib` | BibTeX URL |
+| `q` | Biblio query |
+| `deep` | Search biblio by title as well (`1` / `0`) |
+| `publishers` | Check where publications appeared (`1` / `0`) |
+
+Only what differs from the defaults is written, so the default view keeps a clean URL and a bookmark follows any
+later change of defaults. A fragment never leaves the browser — it is not sent to the server — and opening a link
+applies the settings it carries over whatever this browser remembers, so a shared link shows the same view
+everywhere. Editing the fragment by hand re-runs the check.
+
+**The OpenAlex API key is deliberately not in the URL.** It is a credential, and URLs end up in bookmarks, synced
+browser profiles and pasted messages. It stays in local storage on the machine it was typed on, which means a
+link you share carries your view but not your key — whoever opens it uses their own key, or none.
 
 ## How the comparison works
 
