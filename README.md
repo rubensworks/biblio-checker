@@ -72,8 +72,11 @@ npm run lint    # ESLint, using @rubensworks/eslint-config
 npm test        # Jest
 ```
 
-Pushes to `master` are built and published to GitHub Pages by
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
+## Deployment
+
+`npm run build` writes a self-contained bundle to `dist/`, using a relative base so it works from any
+subdirectory. See [`docs/deployment.md`](docs/deployment.md) for the GitHub Actions workflows that build it
+and publish it to GitHub Pages on every push to the default branch.
 
 ## License
 
