@@ -48,10 +48,12 @@
         </label>
 
         <label class="field field--check">
-          <input id="lookup-dois" class="field__checkbox" type="checkbox">
+          <input id="check-publishers" class="field__checkbox" type="checkbox">
           <span>
-            <span class="field__label">Look up missing DOIs on Crossref</span>
-            <span class="field__hint">Fills in the DOI and published link when the bibliography has none.</span>
+            <span class="field__label">Check where publications appeared, via OpenAlex and Crossref</span>
+            <span class="field__hint">
+              Keeps publications that only exist as a preprint out of the main list, and fills in missing DOIs.
+            </span>
           </span>
         </label>
 
@@ -66,7 +68,8 @@
   <footer class="footer">
     <p>
       Runs entirely in your browser, against the
-      <a href="https://biblio.ugent.be/publication?q=&amp;format=json" target="_blank" rel="noreferrer noopener">biblio.ugent.be JSON API</a>
+      <a href="https://biblio.ugent.be/publication?q=&amp;format=json" target="_blank" rel="noreferrer noopener">biblio.ugent.be JSON API</a>,
+      <a href="https://docs.openalex.org/" target="_blank" rel="noreferrer noopener">OpenAlex</a>
       and <a href="https://api.crossref.org/" target="_blank" rel="noreferrer noopener">Crossref</a>.
       <a href="https://github.com/rubensworks/biblio-checker" target="_blank" rel="noreferrer noopener">Source on GitHub</a>.
     </p>

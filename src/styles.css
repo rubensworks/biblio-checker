@@ -9,6 +9,7 @@
   --color-missing: #b91c1c;
   --color-present: #15803d;
   --color-review: #b45309;
+  --color-preprint: #4f5563;
   --radius: 10px;
   --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 1px 3px rgb(16 24 40 / 4%);
 }
@@ -25,6 +26,7 @@
     --color-missing: #f87171;
     --color-present: #4ade80;
     --color-review: #fbbf24;
+    --color-preprint: #99a2b3;
     --shadow: none;
   }
 }
@@ -216,6 +218,10 @@ code {
   font-weight: 600;
 }
 
+.status--warning {
+  color: var(--color-review);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 0.25; }
   50% { opacity: 1; }
@@ -223,7 +229,7 @@ code {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -241,6 +247,7 @@ code {
 
 .stat--missing { border-left-color: var(--color-missing); }
 .stat--present { border-left-color: var(--color-present); }
+.stat--preprint { border-left-color: var(--color-preprint); }
 .stat--review { border-left-color: var(--color-review); }
 
 .stat__value {
@@ -251,6 +258,7 @@ code {
 
 .stat--missing .stat__value { color: var(--color-missing); }
 .stat--present .stat__value { color: var(--color-present); }
+.stat--preprint .stat__value { color: var(--color-preprint); }
 .stat--review .stat__value { color: var(--color-review); }
 
 .stat__label {
@@ -398,20 +406,20 @@ code {
   background: color-mix(in srgb, var(--color-review) 12%, transparent);
 }
 
-.review {
-  margin-top: 28px;
+.secondary {
+  margin-top: 24px;
   padding: 12px 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   background: var(--color-surface);
 }
 
-.review > summary {
+.secondary > summary {
   cursor: pointer;
   font-weight: 600;
 }
 
-.review > .section-intro {
+.secondary > .section-intro {
   margin-top: 10px;
 }
 

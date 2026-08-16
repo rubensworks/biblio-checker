@@ -1,14 +1,29 @@
 import type { IBiblioRecord } from './biblio';
 import { fetchAllBiblioRecords, searchBiblioByTitle } from './biblio';
 import { parseBibtex } from './bibtex';
-import { lookupDoi } from './crossref';
+import { lookupCrossrefWork } from './crossref';
 import type { IAuthorGroup } from './grouping';
 import { groupByFirstAuthor } from './grouping';
 import type { IMatch } from './matching';
 import { matchPublications } from './matching';
+import { lookupOpenAlexWork } from './openalex';
 import type { IPublication } from './publication';
 import { toPublications } from './publication';
+import { retrying } from './retry';
 import { titleSimilarity } from './similarity';
+import type { IWorkSource } from './status';
+import { resolveStatus } from './status';
+
+/**
+ * The databases consulted to find out whether a publication reached a publisher.
+ *
+ * OpenAlex is asked first because it indexes conference proceedings that never get a DOI,
+ * with Crossref as a second opinion.
+ */
+export const WORK_SOURCES: IWorkSource[] = [
+  { name: 'OpenAlex', lookup: lookupOpenAlexWork },
+  { name: 'Crossref', lookup: lookupCrossrefWork },
+];
 
 /**
  * How the check should be performed.
@@ -29,9 +44,10 @@ export interface ICheckOptions {
    */
   deepCheck: boolean;
   /**
-   * Whether missing DOIs should be looked up on Crossref.
+   * Whether OpenAlex and Crossref should be consulted to find out which missing publications
+   * actually reached a publisher, and to fill in DOIs.
    */
-  lookupDois: boolean;
+  checkPublishers: boolean;
 }
 
 /**
@@ -43,9 +59,13 @@ export interface ICheckResult {
    */
   matches: IMatch[];
   /**
-   * The missing publications, grouped by first author.
+   * The missing publications that reached a publisher, grouped by first author.
    */
   missingGroups: IAuthorGroup[];
+  /**
+   * The missing publications that only exist as a preprint, grouped by first author.
+   */
+  preprintGroups: IAuthorGroup[];
   /**
    * The publications whose match is too close to call, grouped by first author.
    */
@@ -59,15 +79,27 @@ export interface ICheckResult {
    */
   records: IBiblioRecord[];
   /**
-   * DOIs discovered on Crossref, keyed by BibTeX citation key.
+   * DOIs discovered while checking, keyed by BibTeX citation key.
    */
   discoveredDois: Record<string, string>;
+  /**
+   * The names of the databases that could not be reached, if any.
+   */
+  unreachableSources: string[];
 }
 
 /**
- * The maximum number of enrichment requests that may be in flight at once.
+ * The maximum number of biblio requests that may be in flight at once.
  */
 const CONCURRENCY = 4;
+
+/**
+ * The maximum number of requests to external databases that may be in flight at once.
+ *
+ * Kept low on purpose: OpenAlex and Crossref both throttle bursts, and a throttled
+ * lookup costs more than a slow one.
+ */
+const LOOKUP_CONCURRENCY = 2;
 
 /**
  * Progress reporting for a check.
@@ -79,11 +111,16 @@ export type ProgressReporter = (message: string) => void;
  *
  * @param items The items to process.
  * @param task The task to run per item.
+ * @param concurrency The maximum number of tasks to run at once.
  */
-async function mapWithConcurrency<T>(items: T[], task: (item: T) => Promise<void>): Promise<void> {
+async function mapWithConcurrency<T>(
+  items: T[],
+  task: (item: T) => Promise<void>,
+  concurrency = CONCURRENCY,
+): Promise<void> {
   const queue = [ ...items ];
   const workers = Array.from(
-    { length: Math.min(CONCURRENCY, queue.length) },
+    { length: Math.min(concurrency, queue.length) },
     async(): Promise<void> => {
       let next = queue.shift();
       while (next !== undefined) {
@@ -149,26 +186,36 @@ export async function check(
   }
 
   const discoveredDois: Record<string, string> = {};
-  if (options.lookupDois) {
-    const withoutDoi = open.filter((match): boolean => !match.publication.doi);
-    if (withoutDoi.length > 0) {
-      onProgress(`Looking up ${withoutDoi.length} DOIs on Crossref…`);
-      await mapWithConcurrency(withoutDoi, async(match): Promise<void> => {
-        const surname = match.publication.authors[0]?.split(' ').at(-1) ?? '';
-        const doi = await lookupDoi(match.publication.title, surname, fetcher).catch((): string => '');
-        if (doi) {
-          discoveredDois[match.publication.key] = doi;
-        }
-      });
-    }
+  const unreachable = new Set<string>();
+
+  if (options.checkPublishers && open.length > 0) {
+    onProgress(`Checking where ${open.length} publications were published…`);
+    const patientFetcher = retrying(fetcher);
+    await mapWithConcurrency(open, async(match): Promise<void> => {
+      const result = await resolveStatus(
+        match.publication,
+        WORK_SOURCES,
+        patientFetcher,
+        (name): void => void unreachable.add(name),
+      );
+      match.publicationStatus = result.status;
+      if (result.doi) {
+        discoveredDois[match.publication.key] = result.doi;
+      }
+    }, LOOKUP_CONCURRENCY);
   }
+
+  const missing = matches.filter((match): boolean => match.status === 'missing');
+  const preprintOnly = (match: IMatch): boolean => match.publicationStatus === 'preprint';
 
   return {
     matches,
-    missingGroups: groupByFirstAuthor(matches.filter((match): boolean => match.status === 'missing')),
+    missingGroups: groupByFirstAuthor(missing.filter((match): boolean => !preprintOnly(match))),
+    preprintGroups: groupByFirstAuthor(missing.filter(preprintOnly)),
     reviewGroups: groupByFirstAuthor(matches.filter((match): boolean => match.status === 'review')),
     presentCount: matches.filter((match): boolean => match.status === 'present').length,
     records,
     discoveredDois,
+    unreachableSources: [ ...unreachable ].sort((left, right): number => left.localeCompare(right)),
   };
 }
