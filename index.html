@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Biblio Checker</title>
+  <meta name="description" content="Lists which publications from a BibTeX bibliography are still missing from the UGent Academic Bibliography.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="header__inner">
+      <h1 class="header__title">📚 Biblio Checker</h1>
+      <p class="header__subtitle">
+        Which of your publications are not in the
+        <a href="https://biblio.ugent.be/" target="_blank" rel="noreferrer noopener">UGent Academic Bibliography</a>
+        yet?
+      </p>
+    </div>
+  </header>
+
+  <main class="main">
+    <details class="settings">
+      <summary>Settings</summary>
+      <form id="settings" class="settings__form">
+        <label class="field">
+          <span class="field__label">BibTeX URL</span>
+          <input id="bibtex-url" class="field__input" type="url" spellcheck="false" required>
+          <span class="field__hint">Any publicly readable <code>.bib</code> file that allows cross-origin requests.</span>
+        </label>
+
+        <label class="field">
+          <span class="field__label">Biblio query</span>
+          <input id="biblio-query" class="field__input" type="text" spellcheck="false" required>
+          <span class="field__hint">
+            A <a href="https://biblio.ugent.be/publication" target="_blank" rel="noreferrer noopener">biblio.ugent.be</a>
+            search query selecting your records, for example <code>ugent_id:802001410273</code>.
+          </span>
+        </label>
+
+        <label class="field field--check">
+          <input id="deep-check" class="field__checkbox" type="checkbox">
+          <span>
+            <span class="field__label">Search biblio by title as well</span>
+            <span class="field__hint">Finds records that exist in biblio but are not linked to you.</span>
+          </span>
+        </label>
+
+        <label class="field field--check">
+          <input id="lookup-dois" class="field__checkbox" type="checkbox">
+          <span>
+            <span class="field__label">Look up missing DOIs on Crossref</span>
+            <span class="field__hint">Fills in the DOI and published link when the bibliography has none.</span>
+          </span>
+        </label>
+
+        <button id="check" class="button button--primary" type="submit">Check again</button>
+      </form>
+    </details>
+
+    <p id="status" class="status"></p>
+    <section id="results" class="results"></section>
+  </main>
+
+  <footer class="footer">
+    <p>
+      Runs entirely in your browser, against the
+      <a href="https://biblio.ugent.be/publication?q=&amp;format=json" target="_blank" rel="noreferrer noopener">biblio.ugent.be JSON API</a>
+      and <a href="https://api.crossref.org/" target="_blank" rel="noreferrer noopener">Crossref</a>.
+      <a href="https://github.com/rubensworks/biblio-checker" target="_blank" rel="noreferrer noopener">Source on GitHub</a>.
+    </p>
+  </footer>
+
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>
