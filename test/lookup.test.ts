@@ -1,5 +1,5 @@
 import { lookupCrossrefWork } from '../src/lib/crossref';
-import { lookupOpenAlexWork } from '../src/lib/openalex';
+import { openAlexLookup } from '../src/lib/openalex';
 import { sanitizeQueryTitle } from '../src/lib/work';
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
@@ -26,7 +26,7 @@ describe('sanitizeQueryTitle', () => {
   });
 });
 
-describe('lookupOpenAlexWork', () => {
+describe('openAlexLookup', () => {
   it('reports a conference paper as published', async() => {
     const fetcher = jest.fn().mockResolvedValue(openAlexResponse([{
       doi: 'https://doi.org/10.1007/978-3-032-29372-5_37',
@@ -35,7 +35,7 @@ describe('lookupOpenAlexWork', () => {
       primary_location: { source: { display_name: 'Lecture Notes in Computer Science', type: 'book series' }},
     }]));
 
-    await expect(lookupOpenAlexWork({ title: TITLE, author: 'De Smet' }, asFetch(fetcher))).resolves.toEqual({
+    await expect(openAlexLookup()({ title: TITLE, author: 'De Smet' }, asFetch(fetcher))).resolves.toEqual({
       doi: '10.1007/978-3-032-29372-5_37',
       published: true,
       venue: 'Lecture Notes in Computer Science',
@@ -51,7 +51,7 @@ describe('lookupOpenAlexWork', () => {
     }]));
 
     const query = { title: 'Guided Link-Traversal-Based Query Processing', author: '' };
-    const record = await lookupOpenAlexWork(query, asFetch(fetcher));
+    const record = await openAlexLookup()(query, asFetch(fetcher));
 
     expect(record?.published).toBe(false);
     expect(record?.doi).toBe('10.48550/arxiv.2005.02239');
@@ -65,7 +65,7 @@ describe('lookupOpenAlexWork', () => {
       locations: [{ source: { display_name: 'arXiv (Cornell University)', type: 'repository' }}],
     }]));
 
-    await expect(lookupOpenAlexWork({ title: TITLE, author: '' }, asFetch(fetcher)))
+    await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
       .resolves.toEqual({ doi: '', published: false, venue: 'arXiv (Cornell University)' });
   });
 
@@ -80,14 +80,14 @@ describe('lookupOpenAlexWork', () => {
       ],
     }]));
 
-    await expect(lookupOpenAlexWork({ title: TITLE, author: '' }, asFetch(fetcher)))
+    await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
       .resolves.toEqual({ doi: '', published: true, venue: 'Semantic Web Journal' });
   });
 
   it('reports a work without any location as unpublished', async() => {
     const fetcher = jest.fn().mockResolvedValue(openAlexResponse([{ display_name: TITLE, type: 'article' }]));
 
-    const record = await lookupOpenAlexWork({ title: TITLE, author: '' }, asFetch(fetcher));
+    const record = await openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher));
 
     expect(record).toEqual({ doi: '', published: false, venue: '' });
   });
@@ -106,20 +106,20 @@ describe('lookupOpenAlexWork', () => {
       },
     ]));
 
-    await expect(lookupOpenAlexWork({ title: TITLE, author: '' }, asFetch(fetcher)))
+    await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
       .resolves.toMatchObject({ venue: 'The right one' });
   });
 
   it('resolves to nothing when no result matches', async() => {
     const fetcher = jest.fn().mockResolvedValue(openAlexResponse([{ display_name: 'Unrelated work' }]));
 
-    await expect(lookupOpenAlexWork({ title: TITLE, author: '' }, asFetch(fetcher))).resolves.toBeUndefined();
+    await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher))).resolves.toBeUndefined();
   });
 
   it('resolves to nothing for an empty title', async() => {
     const fetcher = jest.fn();
 
-    await expect(lookupOpenAlexWork({ title: ' , ', author: '' }, asFetch(fetcher)))
+    await expect(openAlexLookup()({ title: ' , ', author: '' }, asFetch(fetcher)))
       .resolves.toBeUndefined();
     expect(fetcher).not.toHaveBeenCalled();
   });
@@ -127,15 +127,31 @@ describe('lookupOpenAlexWork', () => {
   it('queries the title through a search filter', async() => {
     const fetcher = jest.fn().mockResolvedValue(openAlexResponse([]));
 
-    await lookupOpenAlexWork({ title: 'A title: with a subtitle', author: '' }, asFetch(fetcher));
+    await openAlexLookup()({ title: 'A title: with a subtitle', author: '' }, asFetch(fetcher));
 
     expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('title.search%3AA+title+with+a+subtitle'));
+  });
+
+  it('sends an API key when it was given one', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([]));
+
+    await openAlexLookup('secret-key')({ title: TITLE, author: '' }, asFetch(fetcher));
+
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('api_key=secret-key'));
+  });
+
+  it('sends no key parameter when it was not given one', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([]));
+
+    await openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher));
+
+    expect(fetcher).toHaveBeenCalledWith(expect.not.stringContaining('api_key'));
   });
 
   it('throws when the API is unavailable, so the caller can tell it apart from a miss', async() => {
     const fetcher = jest.fn().mockResolvedValue(jsonResponse({}, false, 429));
 
-    await expect(lookupOpenAlexWork({ title: TITLE, author: '' }, asFetch(fetcher)))
+    await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
       .rejects.toThrow('OpenAlex lookup failed with HTTP 429');
   });
 });

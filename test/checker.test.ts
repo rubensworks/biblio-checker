@@ -35,6 +35,7 @@ const OPTIONS: ICheckOptions = {
   biblioQuery: 'ugent_id:1',
   deepCheck: false,
   checkPublishers: false,
+  openAlexApiKey: '',
 };
 
 const BIBLIO = {
@@ -209,6 +210,33 @@ describe('check', () => {
     await check({ ...OPTIONS, deepCheck: true, checkPublishers: true }, undefined, fetcher);
 
     expect(lookedUpTitles(fetcher)).not.toContain('Client-Driven Offline-First RDF 1.2 using OR-Sets');
+  });
+
+  it('sends an OpenAlex API key when one is configured', async() => {
+    const fetcher = fetcherFor();
+
+    await check({ ...OPTIONS, checkPublishers: true, openAlexApiKey: 'secret-key' }, undefined, fetcher);
+
+    const openAlex = urlsOf(fetcher).filter((url): boolean => url.includes('openalex'));
+    expect(openAlex).not.toEqual([]);
+    expect(openAlex.every((url): boolean => url.includes('api_key=secret-key'))).toBe(true);
+  });
+
+  it('never sends the OpenAlex key to any other database', async() => {
+    const fetcher = fetcherFor();
+
+    await check({ ...OPTIONS, checkPublishers: true, openAlexApiKey: 'secret-key' }, undefined, fetcher);
+
+    const others = urlsOf(fetcher).filter((url): boolean => !url.includes('openalex'));
+    expect(others.some((url): boolean => url.includes('secret-key'))).toBe(false);
+  });
+
+  it('queries OpenAlex without a key when none is configured', async() => {
+    const fetcher = fetcherFor();
+
+    await check({ ...OPTIONS, checkPublishers: true }, undefined, fetcher);
+
+    expect(urlsOf(fetcher).some((url): boolean => url.includes('api_key'))).toBe(false);
   });
 
   it('reports no unreachable sources on a clean run', async() => {

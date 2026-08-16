@@ -13,6 +13,7 @@ const DEFAULTS: ICheckOptions = {
   biblioQuery: 'ugent_id:802001410273',
   deepCheck: true,
   checkPublishers: true,
+  openAlexApiKey: '',
 };
 
 /**
@@ -25,6 +26,7 @@ const bibtexUrlInput = requireElement<HTMLInputElement>('bibtex-url');
 const biblioQueryInput = requireElement<HTMLInputElement>('biblio-query');
 const deepCheckInput = requireElement<HTMLInputElement>('deep-check');
 const checkPublishersInput = requireElement<HTMLInputElement>('check-publishers');
+const openAlexKeyInput = requireElement<HTMLInputElement>('openalex-key');
 const submitButton = requireElement<HTMLButtonElement>('check');
 const statusElement = requireElement<HTMLParagraphElement>('status');
 const resultsElement = requireElement<HTMLElement>('results');
@@ -40,6 +42,7 @@ function readOptions(): ICheckOptions {
     biblioQuery: biblioQueryInput.value.trim() || DEFAULTS.biblioQuery,
     deepCheck: deepCheckInput.checked,
     checkPublishers: checkPublishersInput.checked,
+    openAlexApiKey: openAlexKeyInput.value.trim(),
   };
 }
 
@@ -53,6 +56,7 @@ function applyOptions(options: ICheckOptions): void {
   biblioQueryInput.value = options.biblioQuery;
   deepCheckInput.checked = options.deepCheck;
   checkPublishersInput.checked = options.checkPublishers;
+  openAlexKeyInput.value = options.openAlexApiKey;
 }
 
 /**
@@ -111,9 +115,12 @@ async function runCheck(): Promise<void> {
         resolveLinks(publication, result.discoveredDois[publication.key]),
       heading: 'Publications still missing from the UGent Academic Bibliography',
     });
+    const needsKey = result.unreachableSources.includes('OpenAlex') && !options.openAlexApiKey;
     const unreachable = result.unreachableSources.length > 0 ?
       ` ${result.unreachableSources.join(' and ')} could not be reached, so some publications may be ` +
-      'classified from the bibliography alone.' :
+      `classified from the bibliography alone.${needsKey ?
+        ' A free OpenAlex API key, set under Settings, raises the daily budget tenfold.' :
+        ''}` :
       '';
     setStatus(
       `Checked ${result.matches.length} publications against ${result.records.length} biblio records.${unreachable}`,

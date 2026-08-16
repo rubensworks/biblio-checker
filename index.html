@@ -57,6 +57,20 @@
           </span>
         </label>
 
+        <label class="field">
+          <span class="field__label">OpenAlex API key <span class="field__optional">optional</span></span>
+          <input id="openalex-key" class="field__input" type="password" autocomplete="off" spellcheck="false"
+                 placeholder="Leave empty to use the keyless budget">
+          <span class="field__hint">
+            Without a key, OpenAlex allows about 100 lookups a day, shared by everyone on your IP address.
+            A free key raises that tenfold: create an account on
+            <a href="https://openalex.org/" target="_blank" rel="noreferrer noopener">openalex.org</a>
+            and copy the key from
+            <a href="https://openalex.org/settings/api" target="_blank" rel="noreferrer noopener">Settings → API key</a>.
+            It is kept in this browser only, and sent to OpenAlex alone.
+          </span>
+        </label>
+
         <button id="check" class="button button--primary" type="submit">Check again</button>
       </form>
     </details>

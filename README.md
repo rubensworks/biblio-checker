@@ -83,6 +83,30 @@ failure — unless the `Retry-After` says the daily quota is gone, in which case
 When **no** source could be reached, the publication keeps an unknown status and stays in the main list with a
 warning, rather than being hidden on a guess. The status line names the databases that were unreachable.
 
+### OpenAlex API key
+
+Optional, and only affects how many lookups you get per day.
+
+OpenAlex charges usage rather than data: every account gets a free daily budget, and a `works` search costs
+$0.001 of it. Without a key you draw from the **keyless budget of $0.10 a day**, which is shared by everyone on
+your IP address — about 100 lookups, and the app spends one per publication that is missing from biblio. A free
+key gives you **$1 a day of your own**, ten times as much, with no payment method involved.
+
+To get one:
+
+1. Create an account on [openalex.org](https://openalex.org/) — it takes about half a minute.
+2. Copy the key from [openalex.org/settings/api](https://openalex.org/settings/api).
+3. Paste it into **Settings → OpenAlex API key** in this app.
+
+The key is stored in this browser's local storage together with the other settings, and is sent as an `api_key`
+query parameter to `api.openalex.org` and to nothing else. There is no backend here, so it never reaches any
+server of this app — but it does mean the key is only as private as the browser profile holding it, so use a
+personal machine, and do not put a key in the repository. If one ever leaks, rotate it at
+[Settings → API key](https://openalex.org/settings/api), which invalidates the old one immediately.
+
+When OpenAlex refuses a lookup because the budget is gone, the check does not stall: the request is given up on
+at once and Crossref answers instead, with the status line saying so.
+
 ### Finding your biblio query
 
 The **Biblio query** setting is a raw [biblio.ugent.be](https://biblio.ugent.be/publication) search query.

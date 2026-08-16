@@ -145,6 +145,12 @@ code {
   margin-top: 4px;
 }
 
+.field__optional {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
 .field__hint {
   display: block;
   color: var(--color-muted);

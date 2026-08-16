@@ -6,7 +6,7 @@ import type { IAuthorGroup } from './grouping';
 import { groupByFirstAuthor } from './grouping';
 import type { IMatch } from './matching';
 import { matchPublications } from './matching';
-import { lookupOpenAlexWork } from './openalex';
+import { openAlexLookup } from './openalex';
 import type { IPublication } from './publication';
 import { toPublications } from './publication';
 import { retrying } from './retry';
@@ -15,15 +15,20 @@ import type { IWorkSource } from './status';
 import { resolveStatus } from './status';
 
 /**
- * The databases consulted to find out whether a publication reached a publisher.
+ * Build the list of databases consulted to find out whether a publication reached a publisher.
  *
  * OpenAlex is asked first because it indexes conference proceedings that never get a DOI,
  * with Crossref as a second opinion.
+ *
+ * @param openAlexApiKey An optional OpenAlex API key.
+ * @returns The databases, in the order they should be consulted.
  */
-export const WORK_SOURCES: IWorkSource[] = [
-  { name: 'OpenAlex', lookup: lookupOpenAlexWork },
-  { name: 'Crossref', lookup: lookupCrossrefWork },
-];
+export function createWorkSources(openAlexApiKey = ''): IWorkSource[] {
+  return [
+    { name: 'OpenAlex', lookup: openAlexLookup(openAlexApiKey) },
+    { name: 'Crossref', lookup: lookupCrossrefWork },
+  ];
+}
 
 /**
  * How the check should be performed.
@@ -50,6 +55,11 @@ export interface ICheckOptions {
    * Publications that are already in biblio are never looked up.
    */
   checkPublishers: boolean;
+  /**
+   * An OpenAlex API key, which raises the daily budget from the keyless one shared by
+   * everyone on the same IP address to a personal one. Optional.
+   */
+  openAlexApiKey: string;
 }
 
 /**
@@ -199,10 +209,11 @@ export async function check(
   if (options.checkPublishers && missing.length > 0) {
     onProgress(`Checking where ${missing.length} publications were published…`);
     const patientFetcher = retrying(fetcher);
+    const sources = createWorkSources(options.openAlexApiKey);
     await mapWithConcurrency(missing, async(match): Promise<void> => {
       const result = await resolveStatus(
         match.publication,
-        WORK_SOURCES,
+        sources,
         patientFetcher,
         (name): void => void unreachable.add(name),
       );

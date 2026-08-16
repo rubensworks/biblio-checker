@@ -1,5 +1,5 @@
 import { normalizeDoi, titleSimilarity } from './similarity';
-import type { IWorkQuery, IWorkRecord } from './work';
+import type { IWorkQuery, IWorkRecord, WorkLookup } from './work';
 import { MIN_TITLE_SIMILARITY, sanitizeQueryTitle } from './work';
 
 /**
@@ -95,7 +95,7 @@ function venueOf(work: IOpenAlexWork): string {
 }
 
 /**
- * Look a publication up in OpenAlex.
+ * Build a lookup that queries OpenAlex.
  *
  * Only results whose title closely matches the queried title are accepted, since OpenAlex
  * always answers with its best guesses.
@@ -103,33 +103,36 @@ function venueOf(work: IOpenAlexWork): string {
  * The author is not used: OpenAlex is queried on title alone, so that a differently spelled
  * name can never hide a publication that is in fact published.
  *
- * @param query What to look up.
- * @param query.title The publication title.
- * @param fetcher The fetch implementation to use.
- * @returns What OpenAlex knows about the publication, or undefined when it has no match.
+ * @param apiKey An OpenAlex API key, which raises the daily budget tenfold. Optional:
+ * without one, the keyless budget shared by everyone on the same IP address applies.
+ * @returns The lookup.
  */
-export async function lookupOpenAlexWork(
-  { title }: IWorkQuery,
-  fetcher: typeof fetch = fetch,
-): Promise<IWorkRecord | undefined> {
-  const sanitized = sanitizeQueryTitle(title);
-  if (!sanitized) {
-    return undefined;
-  }
-
-  const parameters = new URLSearchParams({ filter: `title.search:${sanitized}`, select: SELECTED_FIELDS });
-  parameters.set('per-page', '5');
-
-  const response = await fetcher(`https://api.openalex.org/works?${parameters.toString()}`);
-  if (!response.ok) {
-    throw new Error(`OpenAlex lookup failed with HTTP ${response.status}`);
-  }
-
-  const body = <IOpenAlexResponse> await response.json();
-  for (const work of body.results ?? []) {
-    if (titleSimilarity(title, work.display_name ?? '') >= MIN_TITLE_SIMILARITY) {
-      return { doi: normalizeDoi(work.doi ?? ''), published: isPublished(work), venue: venueOf(work) };
+export function openAlexLookup(apiKey = ''): WorkLookup {
+  return async({ title }: IWorkQuery, fetcher: typeof fetch = fetch): Promise<IWorkRecord | undefined> => {
+    const sanitized = sanitizeQueryTitle(title);
+    if (!sanitized) {
+      return undefined;
     }
-  }
-  return undefined;
+
+    const parameters = new URLSearchParams({ filter: `title.search:${sanitized}`, select: SELECTED_FIELDS });
+    parameters.set('per-page', '5');
+    if (apiKey) {
+      // Sent as a query parameter rather than as a bearer token, since an Authorization
+      // header would turn every lookup into a CORS preflight
+      parameters.set('api_key', apiKey);
+    }
+
+    const response = await fetcher(`https://api.openalex.org/works?${parameters.toString()}`);
+    if (!response.ok) {
+      throw new Error(`OpenAlex lookup failed with HTTP ${response.status}`);
+    }
+
+    const body = <IOpenAlexResponse> await response.json();
+    for (const work of body.results ?? []) {
+      if (titleSimilarity(title, work.display_name ?? '') >= MIN_TITLE_SIMILARITY) {
+        return { doi: normalizeDoi(work.doi ?? ''), published: isPublished(work), venue: venueOf(work) };
+      }
+    }
+    return undefined;
+  };
 }
