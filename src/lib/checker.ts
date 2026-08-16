@@ -44,8 +44,10 @@ export interface ICheckOptions {
    */
   deepCheck: boolean;
   /**
-   * Whether OpenAlex and Crossref should be consulted to find out which missing publications
-   * actually reached a publisher, and to fill in DOIs.
+   * Whether OpenAlex and Crossref should be consulted to find out which of the publications
+   * that are missing from biblio actually reached a publisher, and to fill in their DOIs.
+   *
+   * Publications that are already in biblio are never looked up.
    */
   checkPublishers: boolean;
 }
@@ -188,10 +190,16 @@ export async function check(
   const discoveredDois: Record<string, string> = {};
   const unreachable = new Set<string>();
 
-  if (options.checkPublishers && open.length > 0) {
-    onProgress(`Checking where ${open.length} publications were published…`);
+  // Only publications that are really not in biblio are worth an external lookup: whether
+  // something already registered reached a publisher makes no difference to what has to be
+  // added, so asking about it would just spend somebody else's rate limit. This runs after
+  // the deep check on purpose, so that records found under another author are excluded too.
+  const missing = matches.filter((match): boolean => match.status === 'missing' && !match.unlinked);
+
+  if (options.checkPublishers && missing.length > 0) {
+    onProgress(`Checking where ${missing.length} publications were published…`);
     const patientFetcher = retrying(fetcher);
-    await mapWithConcurrency(open, async(match): Promise<void> => {
+    await mapWithConcurrency(missing, async(match): Promise<void> => {
       const result = await resolveStatus(
         match.publication,
         WORK_SOURCES,
@@ -205,13 +213,13 @@ export async function check(
     }, LOOKUP_CONCURRENCY);
   }
 
-  const missing = matches.filter((match): boolean => match.status === 'missing');
+  const allMissing = matches.filter((match): boolean => match.status === 'missing');
   const preprintOnly = (match: IMatch): boolean => match.publicationStatus === 'preprint';
 
   return {
     matches,
-    missingGroups: groupByFirstAuthor(missing.filter((match): boolean => !preprintOnly(match))),
-    preprintGroups: groupByFirstAuthor(missing.filter(preprintOnly)),
+    missingGroups: groupByFirstAuthor(allMissing.filter((match): boolean => !preprintOnly(match))),
+    preprintGroups: groupByFirstAuthor(allMissing.filter(preprintOnly)),
     reviewGroups: groupByFirstAuthor(matches.filter((match): boolean => match.status === 'review')),
     presentCount: matches.filter((match): boolean => match.status === 'present').length,
     records,

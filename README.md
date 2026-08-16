@@ -60,15 +60,21 @@ keeps the links clickable, while plain text editors get a readable fallback.
 A publication only belongs in biblio once it exists at a publisher, so everything that is still just a preprint
 is kept out of the main list and collapsed at the bottom of the page instead.
 
-The bibliography is trusted first: a DOI that was not registered by arXiv, or a URL pointing at a publisher
-rather than at a self-archived copy, settles the question without a request. Otherwise two databases are asked
-in order, and the first confident answer wins:
+Only publications that are really missing from biblio are looked up. Whether something that is already
+registered reached a publisher makes no difference to what still has to be added, so publications that matched a
+biblio record, that only resemble one closely enough to need review, or that the title search found under
+another author, are all skipped rather than spending somebody else's rate limit on them.
+
+For the ones that remain, the bibliography is trusted first: a DOI that was not registered by arXiv, or a URL
+pointing at a publisher rather than at a self-archived copy, settles the question without a request. Otherwise
+two databases are asked in order, and the first confident answer wins:
 
 1. [**OpenAlex**](https://docs.openalex.org/), which also indexes proceedings that never get a DOI. A work counts
    as published unless it is typed as a `preprint` or every one of its locations is a `repository`, which is how
    OpenAlex types arXiv and institutional archives.
-2. [**Crossref**](https://api.crossref.org/), as a second opinion. Its `posted-content` type means a preprint;
-   `journal-article`, `proceedings-article`, `book-chapter` and friends mean published.
+2. [**Crossref**](https://api.crossref.org/), as a second opinion, and only when OpenAlex had no answer. Its
+   `posted-content` type means a preprint; `journal-article`, `proceedings-article`, `book-chapter` and friends
+   mean published.
 
 Both always answer with their best guesses, so results are only accepted when the returned title closely matches
 the queried one. Both also throttle bursts, so a `429` is retried with a short backoff rather than treated as a
