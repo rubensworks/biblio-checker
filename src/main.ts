@@ -2,6 +2,7 @@ import type { ICheckOptions } from './lib/checker';
 import { check } from './lib/checker';
 import type { IPublicationLinks } from './lib/publication';
 import { resolveLinks } from './lib/publication';
+import { fromFragment, toFragment } from './lib/urlState';
 import { requireElement } from './ui/dom';
 import { renderResult } from './ui/render';
 
@@ -60,16 +61,45 @@ function applyOptions(options: ICheckOptions): void {
 }
 
 /**
- * Load the stored settings, falling back to the defaults.
+ * Read the settings kept in this browser.
+ *
+ * @returns Whatever was stored, which is empty when nothing was.
+ */
+function readStoredOptions(): Partial<ICheckOptions> {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? <Partial<ICheckOptions>> JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Work out which settings to start with.
+ *
+ * The URL fragment wins over what this browser remembers, so that opening a bookmark or a
+ * shared link shows that view rather than the last one used here. The API key is the
+ * exception: it only ever comes from local storage, since it is kept out of links.
  *
  * @returns The settings to start with.
  */
 function loadOptions(): ICheckOptions {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? { ...DEFAULTS, ...<Partial<ICheckOptions>> JSON.parse(stored) } : DEFAULTS;
-  } catch {
-    return DEFAULTS;
+  return { ...DEFAULTS, ...readStoredOptions(), ...fromFragment(globalThis.location.hash) };
+}
+
+/**
+ * Put the current settings in the URL fragment, so the view can be bookmarked.
+ *
+ * The entry is replaced rather than pushed, so that repeated checks do not fill up the
+ * back button with near-identical URLs.
+ *
+ * @param options The settings to reflect in the URL.
+ */
+function storeOptionsInUrl(options: ICheckOptions): void {
+  const fragment = toFragment(options, DEFAULTS);
+  const url = `${globalThis.location.pathname}${globalThis.location.search}${fragment ? `#${fragment}` : ''}`;
+  if (url !== `${globalThis.location.pathname}${globalThis.location.search}${globalThis.location.hash}`) {
+    globalThis.history.replaceState(null, '', url);
   }
 }
 
@@ -103,6 +133,7 @@ function setStatus(message: string, modifier = ''): void {
 async function runCheck(): Promise<void> {
   const options = readOptions();
   storeOptions(options);
+  storeOptionsInUrl(options);
 
   submitButton.disabled = true;
   resultsElement.replaceChildren();
@@ -144,6 +175,13 @@ function startCheck(): void {
 
 form.addEventListener('submit', (event): void => {
   event.preventDefault();
+  startCheck();
+});
+
+// Someone navigating to a different bookmark of this page, or editing the URL by hand,
+// should get that view rather than the one already on screen
+globalThis.addEventListener('hashchange', (): void => {
+  applyOptions(loadOptions());
   startCheck();
 });
 
