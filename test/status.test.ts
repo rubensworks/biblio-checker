@@ -30,8 +30,13 @@ function failingSource(name: string): IWorkSource {
   };
 }
 
-const PUBLISHED: IWorkRecord = { doi: '10.1000/x', published: true, venue: 'A Journal' };
-const PREPRINT: IWorkRecord = { doi: '10.48550/arxiv.1', published: false, venue: 'arXiv' };
+const PUBLISHED: IWorkRecord = { doi: '10.1000/x', published: true, venue: 'A Journal', pdfUrl: '' };
+const PREPRINT: IWorkRecord = {
+  doi: '10.48550/arxiv.1',
+  published: false,
+  venue: 'arXiv',
+  pdfUrl: 'https://arxiv.org/pdf/1',
+};
 
 describe('hasLocalEvidence', () => {
   it('accepts a DOI from the bibliography', () => {
@@ -64,6 +69,7 @@ describe('resolveStatus', () => {
         status: 'published',
         doi: '10.1000/x',
         venue: 'Proceedings of Things',
+        pdfUrl: '',
         source: 'the bibliography',
       });
     expect(lookup).not.toHaveBeenCalled();
@@ -71,12 +77,23 @@ describe('resolveStatus', () => {
 
   it('reports a published work found by the first source', async() => {
     await expect(resolveStatus(publication(), [ source('OpenAlex', PUBLISHED), source('Crossref', PREPRINT) ]))
-      .resolves.toEqual({ status: 'published', doi: '10.1000/x', venue: 'A Journal', source: 'OpenAlex' });
+      .resolves.toEqual({
+        status: 'published',
+        doi: '10.1000/x',
+        venue: 'A Journal',
+        pdfUrl: '',
+        source: 'OpenAlex',
+      });
   });
 
   it('reports a preprint-only work', async() => {
     await expect(resolveStatus(publication(), [ source('OpenAlex', PREPRINT) ]))
       .resolves.toMatchObject({ status: 'preprint', source: 'OpenAlex' });
+  });
+
+  it('carries a PDF reported by a source', async() => {
+    await expect(resolveStatus(publication(), [ source('OpenAlex', PREPRINT) ]))
+      .resolves.toMatchObject({ pdfUrl: 'https://arxiv.org/pdf/1' });
   });
 
   it('falls through to the next source when the first has no match', async() => {
@@ -86,7 +103,7 @@ describe('resolveStatus', () => {
 
   it('reports preprint when every source answered but none had a match', async() => {
     await expect(resolveStatus(publication(), [ source('OpenAlex', undefined), source('Crossref', undefined) ]))
-      .resolves.toEqual({ status: 'preprint', doi: '', venue: '', source: '' });
+      .resolves.toEqual({ status: 'preprint', doi: '', venue: '', pdfUrl: '', source: '' });
   });
 
   it('falls through to the next source when the first is unreachable', async() => {
@@ -105,7 +122,7 @@ describe('resolveStatus', () => {
     const sources = [ failingSource('OpenAlex'), failingSource('Crossref') ];
 
     await expect(resolveStatus(publication(), sources, undefined, onSourceError))
-      .resolves.toEqual({ status: 'unknown', doi: '', venue: '', source: '' });
+      .resolves.toEqual({ status: 'unknown', doi: '', venue: '', pdfUrl: '', source: '' });
     expect(onSourceError).toHaveBeenCalledTimes(2);
   });
 

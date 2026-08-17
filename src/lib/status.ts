@@ -38,6 +38,10 @@ export interface IStatusResult {
    */
   venue: string;
   /**
+   * A freely available PDF discovered while resolving the status, or an empty string.
+   */
+  pdfUrl: string;
+  /**
    * Where the answer came from, such as `OpenAlex` or `the bibliography`.
    */
   source: string;
@@ -85,7 +89,13 @@ export async function resolveStatus(
   onSourceError?: (name: string) => void,
 ): Promise<IStatusResult> {
   if (hasLocalEvidence(publication)) {
-    return { status: 'published', doi: publication.doi, venue: publication.venue, source: LOCAL_SOURCE };
+    return {
+      status: 'published',
+      doi: publication.doi,
+      venue: publication.venue,
+      pdfUrl: '',
+      source: LOCAL_SOURCE,
+    };
   }
 
   const surname = publication.authors[0]?.split(' ').at(-1) ?? '';
@@ -105,12 +115,13 @@ export async function resolveStatus(
         status: record.published ? 'published' : 'preprint',
         doi: record.doi,
         venue: record.venue,
+        pdfUrl: record.pdfUrl,
         source: source.name,
       };
     }
   }
 
   return consulted ?
-      { status: 'preprint', doi: '', venue: '', source: '' } :
-      { status: 'unknown', doi: '', venue: '', source: '' };
+      { status: 'preprint', doi: '', venue: '', pdfUrl: '', source: '' } :
+      { status: 'unknown', doi: '', venue: '', pdfUrl: '', source: '' };
 }

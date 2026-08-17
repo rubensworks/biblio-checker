@@ -15,7 +15,7 @@ const REPOSITORY_SOURCE_TYPE = 'repository';
 /**
  * The fields requested from the API, to keep responses small.
  */
-const SELECTED_FIELDS = 'id,doi,display_name,type,primary_location,locations,publication_year';
+const SELECTED_FIELDS = 'id,doi,display_name,type,primary_location,locations,best_oa_location,publication_year';
 
 /* eslint-disable ts/naming-convention -- OpenAlex serves snake_cased field names */
 
@@ -32,6 +32,7 @@ interface IOpenAlexSource {
  */
 interface IOpenAlexLocation {
   source?: IOpenAlexSource | null;
+  pdf_url?: string | null;
 }
 
 /**
@@ -42,6 +43,7 @@ interface IOpenAlexWork {
   display_name?: string;
   type?: string;
   primary_location?: IOpenAlexLocation | null;
+  best_oa_location?: IOpenAlexLocation | null;
   locations?: IOpenAlexLocation[];
 }
 
@@ -95,6 +97,20 @@ function venueOf(work: IOpenAlexWork): string {
 }
 
 /**
+ * Pick a freely available PDF of a work.
+ *
+ * The open access location OpenAlex itself considers best comes first, with any other
+ * location that carries a PDF as a fallback.
+ *
+ * @param work The work to inspect.
+ * @returns The PDF URL, or an empty string.
+ */
+function pdfUrlOf(work: IOpenAlexWork): string {
+  const locations = [ work.best_oa_location, work.primary_location, ...work.locations ?? [] ];
+  return locations.find((location): boolean => Boolean(location?.pdf_url))?.pdf_url ?? '';
+}
+
+/**
  * Build a lookup that queries OpenAlex.
  *
  * Only results whose title closely matches the queried title are accepted, since OpenAlex
@@ -130,7 +146,12 @@ export function openAlexLookup(apiKey = ''): WorkLookup {
     const body = <IOpenAlexResponse> await response.json();
     for (const work of body.results ?? []) {
       if (titleSimilarity(title, work.display_name ?? '') >= MIN_TITLE_SIMILARITY) {
-        return { doi: normalizeDoi(work.doi ?? ''), published: isPublished(work), venue: venueOf(work) };
+        return {
+          doi: normalizeDoi(work.doi ?? ''),
+          published: isPublished(work),
+          venue: venueOf(work),
+          pdfUrl: pdfUrlOf(work),
+        };
       }
     }
     return undefined;

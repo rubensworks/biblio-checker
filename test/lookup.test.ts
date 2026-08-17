@@ -39,6 +39,7 @@ describe('openAlexLookup', () => {
       doi: '10.1007/978-3-032-29372-5_37',
       published: true,
       venue: 'Lecture Notes in Computer Science',
+      pdfUrl: '',
     });
   });
 
@@ -66,7 +67,7 @@ describe('openAlexLookup', () => {
     }]));
 
     await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
-      .resolves.toEqual({ doi: '', published: false, venue: 'arXiv (Cornell University)' });
+      .resolves.toEqual({ doi: '', published: false, venue: 'arXiv (Cornell University)', pdfUrl: '' });
   });
 
   it('looks past a repository primary location to a publisher location', async() => {
@@ -81,7 +82,7 @@ describe('openAlexLookup', () => {
     }]));
 
     await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
-      .resolves.toEqual({ doi: '', published: true, venue: 'Semantic Web Journal' });
+      .resolves.toEqual({ doi: '', published: true, venue: 'Semantic Web Journal', pdfUrl: '' });
   });
 
   it('reports a work without any location as unpublished', async() => {
@@ -89,7 +90,7 @@ describe('openAlexLookup', () => {
 
     const record = await openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher));
 
-    expect(record).toEqual({ doi: '', published: false, venue: '' });
+    expect(record).toEqual({ doi: '', published: false, venue: '', pdfUrl: '' });
   });
 
   it('skips results whose title does not match', async() => {
@@ -173,7 +174,34 @@ describe('lookupCrossrefWork', () => {
       doi: '10.1007/978-3-032-29372-5_37',
       published: true,
       venue: 'Lecture Notes in Computer Science',
+      pdfUrl: '',
     });
+  });
+
+  it('reports the open access PDF location', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([{
+      display_name: TITLE,
+      type: 'article',
+      best_oa_location: { source: { display_name: 'A Journal', type: 'journal' }, pdf_url: 'https://oa.org/x.pdf' },
+      primary_location: { source: { display_name: 'A Journal', type: 'journal' }},
+    }]));
+
+    await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
+      .resolves.toMatchObject({ pdfUrl: 'https://oa.org/x.pdf' });
+  });
+
+  it('falls back to any location that carries a PDF', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([{
+      display_name: TITLE,
+      type: 'article',
+      locations: [
+        { source: { display_name: 'A repo', type: 'repository' }},
+        { source: { display_name: 'A Journal', type: 'journal' }, pdf_url: 'https://oa.org/y.pdf' },
+      ],
+    }]));
+
+    await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
+      .resolves.toMatchObject({ pdfUrl: 'https://oa.org/y.pdf' });
   });
 
   it('reports posted content as unpublished', async() => {

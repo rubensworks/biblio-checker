@@ -57,6 +57,17 @@
           </span>
         </label>
 
+        <label class="field field--check">
+          <input id="find-pdfs" class="field__checkbox" type="checkbox">
+          <span>
+            <span class="field__label">Look for a direct PDF link</span>
+            <span class="field__hint">
+              Follows the preprint link when it is a landing page, to find the PDF it points at.
+              Publications without one are marked <code>TODO</code> in the copied text.
+            </span>
+          </span>
+        </label>
+
         <label class="field">
           <span class="field__label">OpenAlex API key <span class="field__optional">optional</span></span>
           <input id="openalex-key" class="field__input" type="password" autocomplete="off" spellcheck="false"

@@ -35,6 +35,7 @@ const OPTIONS: ICheckOptions = {
   biblioQuery: 'ugent_id:1',
   deepCheck: false,
   checkPublishers: false,
+  findPdfs: false,
   openAlexApiKey: '',
 };
 

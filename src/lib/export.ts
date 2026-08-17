@@ -18,6 +18,14 @@ export type LinkResolver = (publication: IPublication) => IPublicationLinks;
 export const defaultLinkResolver: LinkResolver = (publication): IPublicationLinks => resolveLinks(publication);
 
 /**
+ * What the copied text says when no PDF could be found.
+ *
+ * Phrased as a TODO so that it stands out in an email and survives a search for what still
+ * has to be chased down.
+ */
+export const PDF_TODO = 'TODO — no PDF found, please provide one';
+
+/**
  * Escape text for safe inclusion in HTML.
  *
  * @param value The text to escape.
@@ -69,12 +77,13 @@ export function formatMatchAsText(match: IMatch, resolveLink: LinkResolver = def
   if (links.doi) {
     lines.push(`  DOI: ${links.doi}`);
   }
-  if (links.preprint) {
+  if (links.preprint && links.preprint !== links.pdf) {
     lines.push(`  Preprint: ${links.preprint}`);
   }
   if (links.published && links.published !== links.doi) {
     lines.push(`  Published: ${links.published}`);
   }
+  lines.push(`  PDF: ${links.pdf || PDF_TODO}`);
 
   return lines.join('\n');
 }
@@ -142,15 +151,16 @@ export function formatMatchAsHtml(match: IMatch, resolveLink: LinkResolver = def
   if (links.doi) {
     linkParts.push(`<a href="${escapeHtml(links.doi)}">DOI</a>`);
   }
-  if (links.preprint) {
+  if (links.preprint && links.preprint !== links.pdf) {
     linkParts.push(`<a href="${escapeHtml(links.preprint)}">Preprint</a>`);
   }
   if (links.published && links.published !== links.doi) {
     linkParts.push(`<a href="${escapeHtml(links.published)}">Published</a>`);
   }
-  if (linkParts.length > 0) {
-    parts.push(`<br>${linkParts.join(' &middot; ')}`);
-  }
+  linkParts.push(links.pdf ?
+    `<a href="${escapeHtml(links.pdf)}">PDF</a>` :
+    `<b>PDF: ${escapeHtml(PDF_TODO)}</b>`);
+  parts.push(`<br>${linkParts.join(' &middot; ')}`);
 
   return `<li>${parts.join('')}</li>`;
 }

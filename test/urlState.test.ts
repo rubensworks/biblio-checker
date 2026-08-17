@@ -6,6 +6,7 @@ const DEFAULTS: ICheckOptions = {
   biblioQuery: 'ugent_id:1',
   deepCheck: true,
   checkPublishers: true,
+  findPdfs: true,
   openAlexApiKey: '',
 };
 
@@ -25,12 +26,14 @@ describe('toFragment', () => {
       biblioQuery: 'ugent_id:2',
       deepCheck: false,
       checkPublishers: false,
+      findPdfs: false,
     }, DEFAULTS);
 
     expect(new URLSearchParams(fragment).get('bib')).toBe('https://example.org/other.bib');
     expect(new URLSearchParams(fragment).get('q')).toBe('ugent_id:2');
     expect(new URLSearchParams(fragment).get('deep')).toBe('0');
     expect(new URLSearchParams(fragment).get('publishers')).toBe('0');
+    expect(new URLSearchParams(fragment).get('pdfs')).toBe('0');
   });
 
   it('writes a flag that was turned on against a default of off', () => {
@@ -64,12 +67,14 @@ describe('fromFragment', () => {
   });
 
   it('reads every setting', () => {
-    expect(fromFragment('#bib=https%3A%2F%2Fexample.org%2Fo.bib&q=ugent_id%3A2&deep=0&publishers=0')).toEqual({
-      bibtexUrl: 'https://example.org/o.bib',
-      biblioQuery: 'ugent_id:2',
-      deepCheck: false,
-      checkPublishers: false,
-    });
+    expect(fromFragment('#bib=https%3A%2F%2Fexample.org%2Fo.bib&q=ugent_id%3A2&deep=0&publishers=0&pdfs=0'))
+      .toEqual({
+        bibtexUrl: 'https://example.org/o.bib',
+        biblioQuery: 'ugent_id:2',
+        deepCheck: false,
+        checkPublishers: false,
+        findPdfs: false,
+      });
   });
 
   it('accepts the usual spellings of a flag', () => {
@@ -102,6 +107,7 @@ describe('fromFragment', () => {
       biblioQuery: 'ugent_id:802001410273',
       deepCheck: false,
       checkPublishers: true,
+      findPdfs: false,
       openAlexApiKey: 'secret-key',
     };
 

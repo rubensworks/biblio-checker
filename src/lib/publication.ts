@@ -1,5 +1,6 @@
 import type { IBibtexEntry } from './bibtex';
 import { parseAuthors } from './bibtex';
+import { pdfFromUrl } from './pdf';
 import { normalizeDoi } from './similarity';
 
 /**
@@ -81,6 +82,10 @@ export interface IPublicationLinks {
    * A link to the publisher-hosted version, or an empty string.
    */
   published: string;
+  /**
+   * A direct link to the PDF of the preprint, or an empty string when none was found.
+   */
+  pdf: string;
 }
 
 /**
@@ -106,9 +111,10 @@ function hostOf(url: string): string {
  *
  * @param publication The publication to derive links for.
  * @param discoveredDoi An optional DOI found elsewhere, such as via Crossref.
+ * @param discoveredPdf An optional PDF URL found elsewhere.
  * @returns The links of the publication.
  */
-export function resolveLinks(publication: IPublication, discoveredDoi = ''): IPublicationLinks {
+export function resolveLinks(publication: IPublication, discoveredDoi = '', discoveredPdf = ''): IPublicationLinks {
   const doi = publication.doi || normalizeDoi(discoveredDoi);
   const doiUrl = doi ? `https://doi.org/${doi}` : '';
 
@@ -129,7 +135,7 @@ export function resolveLinks(publication: IPublication, discoveredDoi = ''): IPu
     published = doiUrl;
   }
 
-  return { doi: doiUrl, preprint, published };
+  return { doi: doiUrl, preprint, published, pdf: discoveredPdf || pdfFromUrl(preprint) };
 }
 
 /**

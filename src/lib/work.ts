@@ -31,6 +31,10 @@ export interface IWorkRecord {
    * The journal, conference or series the work appeared in, or an empty string.
    */
   venue: string;
+  /**
+   * A direct link to a freely available PDF of the work, or an empty string.
+   */
+  pdfUrl: string;
 }
 
 /**

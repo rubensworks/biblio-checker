@@ -21,6 +21,11 @@ const DEEP_CHECK = 'deep';
 const CHECK_PUBLISHERS = 'publishers';
 
 /**
+ * The fragment parameter holding whether PDFs are looked for.
+ */
+const FIND_PDFS = 'pdfs';
+
+/**
  * Render a boolean the way it appears in a fragment.
  *
  * @param value The value to render.
@@ -79,6 +84,9 @@ export function toFragment(options: ICheckOptions, defaults: ICheckOptions): str
   if (options.checkPublishers !== defaults.checkPublishers) {
     parameters.set(CHECK_PUBLISHERS, writeFlag(options.checkPublishers));
   }
+  if (options.findPdfs !== defaults.findPdfs) {
+    parameters.set(FIND_PDFS, writeFlag(options.findPdfs));
+  }
 
   return parameters.toString();
 }
@@ -115,6 +123,11 @@ export function fromFragment(fragment: string): Partial<ICheckOptions> {
   const checkPublishers = readFlag(parameters.get(CHECK_PUBLISHERS));
   if (checkPublishers !== undefined) {
     options.checkPublishers = checkPublishers;
+  }
+
+  const findPdfs = readFlag(parameters.get(FIND_PDFS));
+  if (findPdfs !== undefined) {
+    options.findPdfs = findPdfs;
   }
 
   return options;

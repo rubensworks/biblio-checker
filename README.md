@@ -29,7 +29,9 @@ Results are split into four buckets:
 | **Preprint only** | No publisher version could be found, so it is not ready for biblio yet. Collapsed at the bottom of the page. |
 | **Need a closer look** | Resembles an existing record, but not closely enough to decide automatically. Collapsed at the bottom of the page. |
 
-Every missing publication shows its **DOI**, **preprint link** and **published link** where these are known.
+Every missing publication shows its **DOI**, **preprint link**, **published link** and a direct **PDF link**
+where these are known. When no PDF could be found, the entry is marked `PDF: TODO` — on screen and in the copied
+text — so that a co-author reading your email knows exactly what to send you.
 
 ### Copying into an email
 
@@ -54,6 +56,7 @@ https://rubensworks.github.io/biblio-checker/#bib=https%3A%2F%2Fexample.org%2Fre
 | `q` | Biblio query |
 | `deep` | Search biblio by title as well (`1` / `0`) |
 | `publishers` | Check where publications appeared (`1` / `0`) |
+| `pdfs` | Look for a direct PDF link (`1` / `0`) |
 
 Only what differs from the defaults is written, so the default view keeps a clean URL and a bookmark follows any
 later change of defaults. A fragment never leaves the browser — it is not sent to the server — and opening a link
@@ -107,6 +110,23 @@ failure — unless the `Retry-After` says the daily quota is gone, in which case
 
 When **no** source could be reached, the publication keeps an unknown status and stays in the main list with a
 warning, rather than being hidden on a guess. The status line names the databases that were unreachable.
+
+## Finding the PDF
+
+Biblio wants the PDF itself, but a bibliography usually points at a landing page instead. The PDF is resolved in
+the cheapest order that works, and only for publications that are missing from biblio:
+
+1. **The link already is a PDF.** Nothing to do.
+2. **It is an arXiv abstract page.** `arxiv.org/abs/X` always has its PDF at `arxiv.org/pdf/X`, so no request is
+   needed. (arXiv serves those without a `.pdf` extension, which is why the path is special-cased.)
+3. **OpenAlex reported an open access PDF.** Free, since that lookup already happened.
+4. **The landing page is fetched and searched** for a link to a PDF.
+
+Only PDFs on the *same host as the landing page* are accepted. An author's page links its own PDF relatively,
+while a cross-origin PDF on such a page is much more likely to be a cited paper than the paper being described.
+
+Nothing is guessed: no `paper.pdf`-style URL is invented and probed. If none of the four steps finds a PDF, the
+publication is marked `PDF: TODO` rather than given a link that might 404.
 
 ### OpenAlex API key
 
