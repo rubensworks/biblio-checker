@@ -46,6 +46,7 @@ describe('resolveLinks', () => {
       doi: 'https://doi.org/10.1000/x',
       preprint: '',
       published: 'https://doi.org/10.1000/x',
+      pdf: '',
     });
   });
 
@@ -54,6 +55,7 @@ describe('resolveLinks', () => {
       doi: '',
       preprint: 'https://rubensworks.github.io/paper/',
       published: '',
+      pdf: '',
     });
   });
 
@@ -62,6 +64,7 @@ describe('resolveLinks', () => {
       doi: '',
       preprint: '',
       published: 'https://link.springer.com/chapter/1',
+      pdf: '',
     });
   });
 
@@ -84,11 +87,30 @@ describe('resolveLinks', () => {
     expect(resolveLinks({ ...base, doi: '10.1000/own' }, '10.1000/found').doi).toBe('https://doi.org/10.1000/own');
   });
 
+  it('recognizes a preprint URL that already is a PDF', () => {
+    expect(resolveLinks({ ...base, url: 'https://example.org/paper.pdf' }).pdf)
+      .toBe('https://example.org/paper.pdf');
+  });
+
+  it('derives the PDF of an arXiv abstract page', () => {
+    expect(resolveLinks({ ...base, url: 'https://arxiv.org/abs/2005.02239' }).pdf)
+      .toBe('https://arxiv.org/pdf/2005.02239');
+  });
+
+  it('prefers a PDF discovered elsewhere', () => {
+    expect(resolveLinks({ ...base, url: 'https://example.org/landing/' }, '', 'https://example.org/found.pdf').pdf)
+      .toBe('https://example.org/found.pdf');
+  });
+
+  it('reports no PDF for a landing page', () => {
+    expect(resolveLinks({ ...base, url: 'https://example.org/landing/' }).pdf).toBe('');
+  });
+
   it('survives a malformed URL', () => {
     expect(resolveLinks({ ...base, url: 'not a url' }).preprint).toBe('not a url');
   });
 
   it('reports no links at all', () => {
-    expect(resolveLinks(base)).toEqual({ doi: '', preprint: '', published: '' });
+    expect(resolveLinks(base)).toEqual({ doi: '', preprint: '', published: '', pdf: '' });
   });
 });

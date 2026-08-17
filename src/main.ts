@@ -14,6 +14,7 @@ const DEFAULTS: ICheckOptions = {
   biblioQuery: 'ugent_id:802001410273',
   deepCheck: true,
   checkPublishers: true,
+  findPdfs: true,
   openAlexApiKey: '',
 };
 
@@ -27,6 +28,7 @@ const bibtexUrlInput = requireElement<HTMLInputElement>('bibtex-url');
 const biblioQueryInput = requireElement<HTMLInputElement>('biblio-query');
 const deepCheckInput = requireElement<HTMLInputElement>('deep-check');
 const checkPublishersInput = requireElement<HTMLInputElement>('check-publishers');
+const findPdfsInput = requireElement<HTMLInputElement>('find-pdfs');
 const openAlexKeyInput = requireElement<HTMLInputElement>('openalex-key');
 const submitButton = requireElement<HTMLButtonElement>('check');
 const statusElement = requireElement<HTMLParagraphElement>('status');
@@ -43,6 +45,7 @@ function readOptions(): ICheckOptions {
     biblioQuery: biblioQueryInput.value.trim() || DEFAULTS.biblioQuery,
     deepCheck: deepCheckInput.checked,
     checkPublishers: checkPublishersInput.checked,
+    findPdfs: findPdfsInput.checked,
     openAlexApiKey: openAlexKeyInput.value.trim(),
   };
 }
@@ -57,6 +60,7 @@ function applyOptions(options: ICheckOptions): void {
   biblioQueryInput.value = options.biblioQuery;
   deepCheckInput.checked = options.deepCheck;
   checkPublishersInput.checked = options.checkPublishers;
+  findPdfsInput.checked = options.findPdfs;
   openAlexKeyInput.value = options.openAlexApiKey;
 }
 
@@ -142,8 +146,11 @@ async function runCheck(): Promise<void> {
   try {
     const result = await check(options, (message): void => setStatus(message, 'busy'));
     renderResult(resultsElement, result, {
-      resolveLink: (publication): IPublicationLinks =>
-        resolveLinks(publication, result.discoveredDois[publication.key]),
+      resolveLink: (publication): IPublicationLinks => resolveLinks(
+        publication,
+        result.discoveredDois[publication.key],
+        result.discoveredPdfs[publication.key],
+      ),
       heading: 'Publications still missing from the UGent Academic Bibliography',
     });
     const needsKey = result.unreachableSources.includes('OpenAlex') && !options.openAlexApiKey;

@@ -86,6 +86,7 @@ export async function lookupCrossrefWork(
         doi: normalizeDoi(work.DOI),
         published: PUBLISHED_TYPES.has(work.type ?? ''),
         venue: work['container-title']?.[0] ?? '',
+        pdfUrl: '',
       };
     }
   }

@@ -7,8 +7,9 @@ import { groupByFirstAuthor } from './grouping';
 import type { IMatch } from './matching';
 import { matchPublications } from './matching';
 import { openAlexLookup } from './openalex';
+import { findPdf } from './pdf';
 import type { IPublication } from './publication';
-import { toPublications } from './publication';
+import { resolveLinks, toPublications } from './publication';
 import { retrying } from './retry';
 import { titleSimilarity } from './similarity';
 import type { IWorkSource } from './status';
@@ -56,6 +57,11 @@ export interface ICheckOptions {
    */
   checkPublishers: boolean;
   /**
+   * Whether a direct link to the PDF of each missing publication should be looked for,
+   * which may mean fetching the preprint's landing page to see what it links to.
+   */
+  findPdfs: boolean;
+  /**
    * An OpenAlex API key, which raises the daily budget from the keyless one shared by
    * everyone on the same IP address to a personal one. Optional.
    */
@@ -94,6 +100,10 @@ export interface ICheckResult {
    * DOIs discovered while checking, keyed by BibTeX citation key.
    */
   discoveredDois: Record<string, string>;
+  /**
+   * PDF URLs discovered while checking, keyed by BibTeX citation key.
+   */
+  discoveredPdfs: Record<string, string>;
   /**
    * The names of the databases that could not be reached, if any.
    */
@@ -198,6 +208,7 @@ export async function check(
   }
 
   const discoveredDois: Record<string, string> = {};
+  const discoveredPdfs: Record<string, string> = {};
   const unreachable = new Set<string>();
 
   // Only publications that are really not in biblio are worth an external lookup: whether
@@ -221,7 +232,21 @@ export async function check(
       if (result.doi) {
         discoveredDois[match.publication.key] = result.doi;
       }
+      if (result.pdfUrl) {
+        discoveredPdfs[match.publication.key] = result.pdfUrl;
+      }
     }, LOOKUP_CONCURRENCY);
+  }
+
+  if (options.findPdfs && missing.length > 0) {
+    onProgress(`Looking for the PDF of ${missing.length} publications…`);
+    await mapWithConcurrency(missing, async(match): Promise<void> => {
+      const { preprint } = resolveLinks(match.publication);
+      const pdf = await findPdf(preprint, discoveredPdfs[match.publication.key], fetcher);
+      if (pdf) {
+        discoveredPdfs[match.publication.key] = pdf;
+      }
+    });
   }
 
   const allMissing = matches.filter((match): boolean => match.status === 'missing');
@@ -235,6 +260,7 @@ export async function check(
     presentCount: matches.filter((match): boolean => match.status === 'present').length,
     records,
     discoveredDois,
+    discoveredPdfs,
     unreachableSources: [ ...unreachable ].sort((left, right): number => left.localeCompare(right)),
   };
 }

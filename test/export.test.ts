@@ -1,4 +1,5 @@
 import {
+  PDF_TODO,
   escapeHtml,
   formatAuthors,
   formatGroupsAsHtml,
@@ -51,15 +52,43 @@ describe('formatMatchAsText', () => {
       '  Jane Doe and Richard Roe',
       '  Conference: Proceedings of Things',
       '  DOI: https://doi.org/10.1000/x',
-      '  Preprint: https://example.org/paper.pdf',
+      '  PDF: https://example.org/paper.pdf',
     ].join('\n'));
   });
 
-  it('omits links that are not known', () => {
+  it('marks a missing PDF as a TODO', () => {
+    expect(formatMatchAsText(match({ url: 'https://example.org/landing/' }))).toBe([
+      'A title (2020)',
+      '  Jane Doe and Richard Roe',
+      '  Conference: Proceedings of Things',
+      '  DOI: https://doi.org/10.1000/x',
+      '  Preprint: https://example.org/landing/',
+      `  PDF: ${PDF_TODO}`,
+    ].join('\n'));
+    expect(PDF_TODO).toContain('TODO');
+  });
+
+  it('lists the preprint separately when it is not the PDF itself', () => {
+    const text = formatMatchAsText(
+      match({ url: 'https://example.org/landing/' }),
+      (): { doi: string; preprint: string; published: string; pdf: string } => ({
+        doi: '',
+        preprint: 'https://example.org/landing/',
+        published: '',
+        pdf: 'https://example.org/landing/paper.pdf',
+      }),
+    );
+
+    expect(text).toContain('Preprint: https://example.org/landing/');
+    expect(text).toContain('PDF: https://example.org/landing/paper.pdf');
+  });
+
+  it('omits links that are not known, but still asks for a PDF', () => {
     expect(formatMatchAsText(match({ doi: '', url: '' }))).toBe([
       'A title (2020)',
       '  Jane Doe and Richard Roe',
       '  Conference: Proceedings of Things',
+      `  PDF: ${PDF_TODO}`,
     ].join('\n'));
   });
 
@@ -84,13 +113,13 @@ describe('formatGroupsAsText', () => {
       '   Jane Doe and Richard Roe',
       '   Conference: Proceedings of Things',
       '   DOI: https://doi.org/10.1000/x',
-      '   Preprint: https://example.org/paper.pdf',
+      '   PDF: https://example.org/paper.pdf',
       '',
       '2. A title (2020)',
       '   Jane Doe and Richard Roe',
       '   Conference: Proceedings of Things',
       '   DOI: https://doi.org/10.1000/x',
-      '   Preprint: https://example.org/paper.pdf',
+      '   PDF: https://example.org/paper.pdf',
     ].join('\n'));
   });
 
@@ -104,12 +133,13 @@ describe('formatGroupsAsText', () => {
   it('uses a custom link resolver', () => {
     const text = formatGroupsAsText(
       groupByFirstAuthor([ match() ]),
-      (): { doi: string; preprint: string; published: string } =>
-        ({ doi: 'https://doi.org/10.1000/found', preprint: '', published: '' }),
+      (): { doi: string; preprint: string; published: string; pdf: string } =>
+        ({ doi: 'https://doi.org/10.1000/found', preprint: '', published: '', pdf: '' }),
     );
 
     expect(text).toContain('DOI: https://doi.org/10.1000/found');
     expect(text).not.toContain('Preprint:');
+    expect(text).toContain(`PDF: ${PDF_TODO}`);
   });
 });
 
@@ -119,7 +149,14 @@ describe('formatMatchAsHtml', () => {
 
     expect(html).toContain('<b>A title</b>');
     expect(html).toContain('<a href="https://doi.org/10.1000/x">DOI</a>');
-    expect(html).toContain('<a href="https://example.org/paper.pdf">Preprint</a>');
+    expect(html).toContain('<a href="https://example.org/paper.pdf">PDF</a>');
+  });
+
+  it('renders a missing PDF as a bold TODO', () => {
+    const html = formatMatchAsHtml(match({ url: 'https://example.org/landing/' }));
+
+    expect(html).toContain(`<b>PDF: ${PDF_TODO}</b>`);
+    expect(html).not.toContain('>PDF</a>');
   });
 
   it('escapes the title', () => {

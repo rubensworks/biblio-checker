@@ -399,6 +399,17 @@ code {
   font-style: italic;
 }
 
+.link--pdf {
+  color: var(--color-present);
+  border-color: currentcolor;
+}
+
+.link--todo {
+  color: var(--color-review);
+  border-color: currentcolor;
+  background: color-mix(in srgb, var(--color-review) 10%, transparent);
+}
+
 .notice {
   margin-top: 8px;
   padding: 6px 10px;

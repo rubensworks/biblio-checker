@@ -72,8 +72,9 @@ function renderLinks(match: IMatch, context: IRenderContext): HTMLElement {
 
   const entries: [ string, string, string ][] = [
     [ 'doi', 'DOI', links.doi ],
-    [ 'preprint', 'Preprint', links.preprint ],
+    [ 'preprint', 'Preprint', links.preprint === links.pdf ? '' : links.preprint ],
     [ 'published', 'Published', links.published === links.doi ? '' : links.published ],
+    [ 'pdf', 'PDF', links.pdf ],
   ];
 
   for (const [ kind, label, href ] of entries) {
@@ -86,8 +87,8 @@ function renderLinks(match: IMatch, context: IRenderContext): HTMLElement {
     }
   }
 
-  if (container.children.length === 0) {
-    container.append(element('span', { className: 'link link--none', text: 'no links known' }));
+  if (!links.pdf) {
+    container.append(element('span', { className: 'link link--todo', text: 'PDF: TODO' }));
   }
 
   return container;
