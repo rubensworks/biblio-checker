@@ -83,6 +83,23 @@ link you share carries your view but not your key — whoever opens it uses thei
    * **Check where publications appeared** finds out which ones actually reached a publisher, and fills in DOIs
      along the way. See below.
 
+### What a DOI in the bibliography buys
+
+A `doi` field names the work itself, so wherever the app would otherwise have to recognize a publication by its
+title, it uses that DOI instead:
+
+* a biblio record with the same DOI is the same publication, whatever either title says, both for your own
+  records and for the ones the title search turns up under another author;
+* the publication counts as published without a single request, unless arXiv registered the DOI;
+* OpenAlex and Crossref are asked for that exact work rather than searched by title, which is cheaper and cannot
+  return a near miss. That is also how the PDF of such a publication is found, since its DOI means no lookup ran
+  that would otherwise have reported one;
+* the DOI and its `https://doi.org/` link end up in the results and in everything copied from them.
+
+The one place the DOI is deliberately ignored is the published-or-preprint question for an arXiv DOI: every arXiv
+preprint has one, so looking it up would answer `preprint` for papers that did reach a publisher. Those are still
+recognized by title.
+
 ## Deciding what counts as published
 
 A publication only belongs in biblio once it exists at a publisher, so everything that is still just a preprint
@@ -95,7 +112,7 @@ another author, are all skipped rather than spending somebody else's rate limit 
 
 For the ones that remain, the bibliography is trusted first: a DOI that was not registered by arXiv, or a URL
 pointing at a publisher rather than at a self-archived copy, settles the question without a request. Otherwise
-two databases are asked in order, and the first confident answer wins:
+two databases are asked in order, by title, and the first confident answer wins:
 
 1. [**OpenAlex**](https://docs.openalex.org/), which also indexes proceedings that never get a DOI. A work counts
    as published unless it is typed as a `preprint` or every one of its locations is a `repository`, which is how
@@ -119,7 +136,9 @@ the cheapest order that works, and only for publications that are missing from b
 1. **The link already is a PDF.** Nothing to do.
 2. **It is an arXiv abstract page.** `arxiv.org/abs/X` always has its PDF at `arxiv.org/pdf/X`, so no request is
    needed. (arXiv serves those without a `.pdf` extension, which is why the path is special-cased.)
-3. **OpenAlex reported an open access PDF.** Free, since that lookup already happened.
+3. **A database reported an open access PDF.** Free when the lookup above already happened. When the
+   bibliography lists a DOI it did not, since the DOI settled the publisher question by itself, so the databases
+   are asked for that DOI here instead.
 4. **The landing page is fetched and searched** for a link to a PDF.
 
 Only PDFs on the *same host as the landing page* are accepted. An author's page links its own PDF relatively,

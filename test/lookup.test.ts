@@ -155,6 +155,48 @@ describe('openAlexLookup', () => {
     await expect(openAlexLookup()({ title: TITLE, author: '' }, asFetch(fetcher)))
       .rejects.toThrow('OpenAlex lookup failed with HTTP 429');
   });
+
+  it('asks for the work itself when the bibliography lists a DOI', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([]));
+
+    await openAlexLookup()({ title: TITLE, author: '', doi: '10.1007/978-3-032-29372-5_37' }, asFetch(fetcher));
+
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('filter=doi%3A10.1007%2F978-3-032-29372-5_37'));
+    expect(fetcher).toHaveBeenCalledWith(expect.not.stringContaining('title.search'));
+  });
+
+  it('accepts what a DOI returns, however its title was written down', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([{
+      doi: 'https://doi.org/10.1007/978-3-032-29372-5_37',
+      display_name: 'A title recorded entirely differently',
+      type: 'article',
+      best_oa_location: { source: { display_name: 'A Journal', type: 'journal' }, pdf_url: 'https://oa.org/x.pdf' },
+      primary_location: { source: { display_name: 'A Journal', type: 'journal' }},
+    }]));
+
+    await expect(openAlexLookup()({ title: TITLE, author: '', doi: '10.1007/978-3-032-29372-5_37' }, asFetch(fetcher)))
+      .resolves.toEqual({
+        doi: '10.1007/978-3-032-29372-5_37',
+        published: true,
+        venue: 'A Journal',
+        pdfUrl: 'https://oa.org/x.pdf',
+      });
+  });
+
+  it('looks a DOI up even when there is no title to search for', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([]));
+
+    await openAlexLookup()({ title: '', author: '', doi: '10.1000/x' }, asFetch(fetcher));
+
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('filter=doi%3A10.1000%2Fx'));
+  });
+
+  it('resolves to nothing when the DOI is unknown to OpenAlex', async() => {
+    const fetcher = jest.fn().mockResolvedValue(openAlexResponse([]));
+
+    await expect(openAlexLookup()({ title: TITLE, author: '', doi: '10.1000/unknown' }, asFetch(fetcher)))
+      .resolves.toBeUndefined();
+  });
 });
 
 describe('lookupCrossrefWork', () => {
@@ -240,5 +282,30 @@ describe('lookupCrossrefWork', () => {
 
     await expect(lookupCrossrefWork({ title: TITLE, author: '' }, asFetch(fetcher)))
       .rejects.toThrow('Crossref lookup failed with HTTP 500');
+  });
+
+  it('asks for the work itself when the bibliography lists a DOI', async() => {
+    const fetcher = jest.fn().mockResolvedValue(crossrefResponse([]));
+
+    await lookupCrossrefWork({ title: TITLE, author: 'De Smet', doi: '10.1000/x' }, asFetch(fetcher));
+
+    expect(fetcher).toHaveBeenCalledWith(expect.stringContaining('filter=doi%3A10.1000%2Fx'));
+    expect(fetcher).toHaveBeenCalledWith(expect.not.stringContaining('query.'));
+  });
+
+  it('accepts what a DOI returns, however its title was written down', async() => {
+    const fetcher = jest.fn().mockResolvedValue(crossrefResponse([
+      { DOI: '10.1000/x', title: [ 'A title recorded entirely differently' ], type: 'journal-article' },
+    ]));
+
+    await expect(lookupCrossrefWork({ title: TITLE, author: '', doi: '10.1000/x' }, asFetch(fetcher)))
+      .resolves.toMatchObject({ doi: '10.1000/x', published: true });
+  });
+
+  it('resolves to nothing when the DOI is unknown to Crossref', async() => {
+    const fetcher = jest.fn().mockResolvedValue(crossrefResponse([]));
+
+    await expect(lookupCrossrefWork({ title: TITLE, author: '', doi: '10.1000/unknown' }, asFetch(fetcher)))
+      .resolves.toBeUndefined();
   });
 });
