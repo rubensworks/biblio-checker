@@ -55,23 +55,30 @@ interface ICrossrefResponse {
 /**
  * Look a publication up in Crossref.
  *
- * Only results whose title closely matches the queried title are accepted, since Crossref
- * always answers with its best guesses.
+ * A DOI is looked up as such, which asks Crossref for that exact work. Without one, the
+ * bibliographic details are searched for and only results whose title closely matches are
+ * accepted, since Crossref always answers with its best guesses.
  *
  * @param query What to look up.
  * @param query.title The publication title.
  * @param query.author A surname to narrow the query with, if available.
+ * @param query.doi The DOI of the publication, if the bibliography lists one.
  * @param fetcher The fetch implementation to use.
  * @returns What Crossref knows about the publication, or undefined when it has no match.
  */
 export async function lookupCrossrefWork(
-  { title, author }: IWorkQuery,
+  { title, author, doi }: IWorkQuery,
   fetcher: typeof fetch = fetch,
 ): Promise<IWorkRecord | undefined> {
   const parameters = new URLSearchParams({ rows: '5', select: SELECTED_FIELDS });
-  parameters.set('query.bibliographic', title);
-  if (author) {
-    parameters.set('query.author', author);
+  if (doi) {
+    // Filtered rather than requested as /works/<doi>, since that route rejects `select`
+    parameters.set('filter', `doi:${doi}`);
+  } else {
+    parameters.set('query.bibliographic', title);
+    if (author) {
+      parameters.set('query.author', author);
+    }
   }
 
   const response = await fetcher(`https://api.crossref.org/works?${parameters.toString()}`);
@@ -80,8 +87,10 @@ export async function lookupCrossrefWork(
   }
 
   const body = <ICrossrefResponse> await response.json();
+  // A DOI names one work, so what comes back for one needs no verifying
+  const identified = Boolean(doi);
   for (const work of body.message?.items ?? []) {
-    if (titleSimilarity(title, work.title?.[0] ?? '') >= MIN_TITLE_SIMILARITY) {
+    if (identified || titleSimilarity(title, work.title?.[0] ?? '') >= MIN_TITLE_SIMILARITY) {
       return {
         doi: normalizeDoi(work.DOI),
         published: PUBLISHED_TYPES.has(work.type ?? ''),

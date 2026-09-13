@@ -112,6 +112,51 @@ function fetcherFor(overrides: { openalex?: unknown; crossref?: unknown; failOpe
   });
 }
 
+/**
+ * Build a fetcher for a bibliography of one publication that carries a DOI.
+ *
+ * Biblio knows nothing about it, so it counts as missing, and OpenAlex only answers when it
+ * is asked for the DOI itself.
+ *
+ * @param options How the fetcher should answer.
+ * @param options.url The URL of the single bibliography entry.
+ * @param options.titleSearch What a biblio title search should return.
+ * @returns The fetcher.
+ */
+function doiFetcherFor({ url, titleSearch }: { url: string; titleSearch?: unknown }): typeof fetch {
+  const bibtex = `@inproceedings{withdoi_2024,
+  author    = {Doe, Jane},
+  title     = {A published title},
+  booktitle = {Proceedings of Things},
+  year      = {2024},
+  doi       = {10.1000/x},
+  url       = {${url}},
+}`;
+
+  return <typeof fetch> <unknown> jest.fn(async(requested: string): Promise<unknown> => {
+    if (requested.endsWith('.bib')) {
+      return { ok: true, status: 200, text: async(): Promise<string> => bibtex };
+    }
+    if (requested.includes('openalex')) {
+      const body = requested.includes('filter=doi%3A10.1000%2Fx') ?
+          { results: [{
+            doi: 'https://doi.org/10.1000/x',
+            display_name: 'A published title',
+            type: 'article',
+            best_oa_location: { source: { display_name: 'A Journal', type: 'journal' }, pdf_url: 'https://oa.org/x.pdf' },
+          }]} :
+          { results: []};
+      return { ok: true, status: 200, json: async(): Promise<unknown> => body };
+    }
+    if (requested.includes('crossref')) {
+      return { ok: true, status: 200, json: async(): Promise<unknown> => ({ message: { items: []}}) };
+    }
+    const isTitleSearch = requested.includes(encodeURIComponent('"'));
+    const body = isTitleSearch ? titleSearch ?? { total: 0, hits: []} : { total: 0, hits: []};
+    return { ok: true, status: 200, json: async(): Promise<unknown> => body };
+  });
+}
+
 describe('check', () => {
   it('separates missing, present and uncertain publications', async() => {
     const result = await check(OPTIONS, undefined, fetcherFor());
@@ -274,6 +319,43 @@ describe('check', () => {
     const flagged = result.matches.find((match): boolean => match.publication.key === 'published_2024');
 
     expect(flagged?.unlinked?.id).toBe('ID2');
+  });
+
+  it('asks for the open access PDF of a publication the bibliography gives a DOI for', async() => {
+    const fetcher = doiFetcherFor({ url: 'https://link.springer.com/chapter/1' });
+
+    const result = await check({ ...OPTIONS, findPdfs: true }, undefined, fetcher);
+
+    expect(urlsOf(fetcher)).toContainEqual(expect.stringContaining('filter=doi%3A10.1000%2Fx'));
+    expect(result.discoveredPdfs).toEqual({ withdoi_2024: 'https://oa.org/x.pdf' });
+  });
+
+  it('does not spend a lookup when the bibliography already leads to a PDF', async() => {
+    const fetcher = doiFetcherFor({ url: 'https://arxiv.org/abs/1' });
+
+    const result = await check({ ...OPTIONS, findPdfs: true }, undefined, fetcher);
+
+    expect(urlsOf(fetcher)).not.toContainEqual(expect.stringContaining('filter=doi'));
+    expect(result.discoveredPdfs).toEqual({ withdoi_2024: 'https://arxiv.org/pdf/1' });
+  });
+
+  it('leaves the DOI alone when PDFs are not being looked for', async() => {
+    const fetcher = doiFetcherFor({ url: 'https://link.springer.com/chapter/1' });
+
+    await check(OPTIONS, undefined, fetcher);
+
+    expect(urlsOf(fetcher)).not.toContainEqual(expect.stringContaining('openalex'));
+  });
+
+  it('matches an unlinked biblio record on a shared DOI, however its title reads', async() => {
+    const fetcher = doiFetcherFor({
+      url: 'https://link.springer.com/chapter/1',
+      titleSearch: { total: 1, hits: [{ _id: 'ID9', title: 'A rather different wording', doi: 'https://doi.org/10.1000/X' }]},
+    });
+
+    const result = await check({ ...OPTIONS, deepCheck: true }, undefined, fetcher);
+
+    expect(result.matches[0].unlinked?.id).toBe('ID9');
   });
 
   it('throws a readable error when the bibliography cannot be downloaded', async() => {

@@ -113,8 +113,9 @@ function pdfUrlOf(work: IOpenAlexWork): string {
 /**
  * Build a lookup that queries OpenAlex.
  *
- * Only results whose title closely matches the queried title are accepted, since OpenAlex
- * always answers with its best guesses.
+ * A DOI is looked up as such, which asks OpenAlex for that exact work. Without one, the
+ * title is searched for and only results whose title closely matches are accepted, since
+ * OpenAlex always answers with its best guesses.
  *
  * The author is not used: OpenAlex is queried on title alone, so that a differently spelled
  * name can never hide a publication that is in fact published.
@@ -124,13 +125,14 @@ function pdfUrlOf(work: IOpenAlexWork): string {
  * @returns The lookup.
  */
 export function openAlexLookup(apiKey = ''): WorkLookup {
-  return async({ title }: IWorkQuery, fetcher: typeof fetch = fetch): Promise<IWorkRecord | undefined> => {
+  return async({ title, doi }: IWorkQuery, fetcher: typeof fetch = fetch): Promise<IWorkRecord | undefined> => {
     const sanitized = sanitizeQueryTitle(title);
-    if (!sanitized) {
+    if (!doi && !sanitized) {
       return undefined;
     }
 
-    const parameters = new URLSearchParams({ filter: `title.search:${sanitized}`, select: SELECTED_FIELDS });
+    const filter = doi ? `doi:${doi}` : `title.search:${sanitized}`;
+    const parameters = new URLSearchParams({ filter, select: SELECTED_FIELDS });
     parameters.set('per-page', '5');
     if (apiKey) {
       // Sent as a query parameter rather than as a bearer token, since an Authorization
@@ -144,8 +146,10 @@ export function openAlexLookup(apiKey = ''): WorkLookup {
     }
 
     const body = <IOpenAlexResponse> await response.json();
+    // A DOI names one work, so what comes back for one needs no verifying
+    const identified = Boolean(doi);
     for (const work of body.results ?? []) {
-      if (titleSimilarity(title, work.display_name ?? '') >= MIN_TITLE_SIMILARITY) {
+      if (identified || titleSimilarity(title, work.display_name ?? '') >= MIN_TITLE_SIMILARITY) {
         return {
           doi: normalizeDoi(work.doi ?? ''),
           published: isPublished(work),

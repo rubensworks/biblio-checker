@@ -7,13 +7,13 @@ import { groupByFirstAuthor } from './grouping';
 import type { IMatch } from './matching';
 import { matchPublications } from './matching';
 import { openAlexLookup } from './openalex';
-import { findPdf } from './pdf';
+import { findPdf, pdfFromUrl } from './pdf';
 import type { IPublication } from './publication';
 import { resolveLinks, toPublications } from './publication';
 import { retrying } from './retry';
 import { titleSimilarity } from './similarity';
 import type { IWorkSource } from './status';
-import { resolveStatus } from './status';
+import { findPdfByDoi, resolveStatus } from './status';
 
 /**
  * Build the list of databases consulted to find out whether a publication reached a publisher.
@@ -200,7 +200,10 @@ export async function check(
     onProgress(`Searching biblio by title for ${open.length} publications…`);
     await mapWithConcurrency(open, async(match): Promise<void> => {
       const candidates = await searchBiblioByTitle(match.publication.title, fetcher).catch((): IBiblioRecord[] => []);
-      const hit = candidates.find((record): boolean => titleSimilarity(match.publication.title, record.title) >= 0.75);
+      // A shared DOI settles it, however the titles were written down
+      const { doi } = match.publication;
+      const hit = (doi ? candidates.find((record): boolean => record.dois.includes(doi)) : undefined) ??
+        candidates.find((record): boolean => titleSimilarity(match.publication.title, record.title) >= 0.75);
       if (hit) {
         match.unlinked = hit;
       }
@@ -217,17 +220,14 @@ export async function check(
   // the deep check on purpose, so that records found under another author are excluded too.
   const missing = matches.filter((match): boolean => match.status === 'missing' && !match.unlinked);
 
+  const patientFetcher = retrying(fetcher);
+  const sources = createWorkSources(options.openAlexApiKey);
+  const reportUnreachable = (name: string): void => void unreachable.add(name);
+
   if (options.checkPublishers && missing.length > 0) {
     onProgress(`Checking where ${missing.length} publications were published…`);
-    const patientFetcher = retrying(fetcher);
-    const sources = createWorkSources(options.openAlexApiKey);
     await mapWithConcurrency(missing, async(match): Promise<void> => {
-      const result = await resolveStatus(
-        match.publication,
-        sources,
-        patientFetcher,
-        (name): void => void unreachable.add(name),
-      );
+      const result = await resolveStatus(match.publication, sources, patientFetcher, reportUnreachable);
       match.publicationStatus = result.status;
       if (result.doi) {
         discoveredDois[match.publication.key] = result.doi;
@@ -239,6 +239,23 @@ export async function check(
   }
 
   if (options.findPdfs && missing.length > 0) {
+    // A DOI in the bibliography answers the publisher question on its own, which means no
+    // lookup ran that could report an open access PDF. Asking for that DOI fills the gap,
+    // but only where the bibliography does not already lead to a PDF by itself.
+    const byDoi = missing.filter((match): boolean => Boolean(match.publication.doi) &&
+      !discoveredPdfs[match.publication.key] &&
+      !pdfFromUrl(resolveLinks(match.publication).preprint));
+
+    if (byDoi.length > 0) {
+      onProgress(`Looking up the DOI of ${byDoi.length} publications…`);
+      await mapWithConcurrency(byDoi, async(match): Promise<void> => {
+        const pdf = await findPdfByDoi(match.publication, sources, patientFetcher, reportUnreachable);
+        if (pdf) {
+          discoveredPdfs[match.publication.key] = pdf;
+        }
+      }, LOOKUP_CONCURRENCY);
+    }
+
     onProgress(`Looking for the PDF of ${missing.length} publications…`);
     await mapWithConcurrency(missing, async(match): Promise<void> => {
       const { preprint } = resolveLinks(match.publication);

@@ -49,6 +49,13 @@ export interface IWorkQuery {
    * A surname to narrow the query with, which sources may ignore.
    */
   author: string;
+  /**
+   * The DOI of the publication, when the bibliography lists one.
+   *
+   * A DOI identifies the work itself, so a source that is given one looks that work up
+   * directly rather than searching for its title and weighing what comes back.
+   */
+  doi?: string;
 }
 
 /**

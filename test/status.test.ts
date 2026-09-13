@@ -1,6 +1,6 @@
 import type { IPublication } from '../src/lib/publication';
 import type { IWorkSource } from '../src/lib/status';
-import { hasLocalEvidence, resolveStatus } from '../src/lib/status';
+import { findPdfByDoi, hasLocalEvidence, resolveStatus } from '../src/lib/status';
 import type { IWorkRecord } from '../src/lib/work';
 
 function publication(overrides: Partial<IPublication> = {}): IPublication {
@@ -136,5 +136,56 @@ describe('resolveStatus', () => {
     await resolveStatus(publication({ authors: [ 'Jitse De Smet', 'Ruben Taelman' ]}), [{ name: 'X', lookup }]);
 
     expect(lookup).toHaveBeenCalledWith({ title: 'A title', author: 'Smet' }, expect.anything());
+  });
+
+  it('does not look an arXiv DOI up, since it would answer preprint for a published paper', async() => {
+    const lookup = jest.fn().mockResolvedValue(PUBLISHED);
+
+    await expect(resolveStatus(publication({ doi: '10.48550/arxiv.1' }), [{ name: 'X', lookup }]))
+      .resolves.toMatchObject({ status: 'published' });
+    expect(lookup).toHaveBeenCalledWith({ title: 'A title', author: 'Doe' }, expect.anything());
+  });
+});
+
+describe('findPdfByDoi', () => {
+  const OPEN_ACCESS: IWorkRecord = {
+    doi: '10.1000/x',
+    published: true,
+    venue: 'A Journal',
+    pdfUrl: 'https://oa.org/x.pdf',
+  };
+
+  it('reports the open access PDF a source knows for the DOI', async() => {
+    const sources = [ source('OpenAlex', OPEN_ACCESS) ];
+
+    await expect(findPdfByDoi(publication({ doi: '10.1000/x' }), sources)).resolves.toBe('https://oa.org/x.pdf');
+  });
+
+  it('looks the work up by its DOI rather than by its title', async() => {
+    const lookup = jest.fn().mockResolvedValue(undefined);
+
+    await findPdfByDoi(publication({ doi: '10.1000/x' }), [{ name: 'X', lookup }]);
+
+    expect(lookup).toHaveBeenCalledWith({ title: 'A title', author: '', doi: '10.1000/x' }, expect.anything());
+  });
+
+  it('asks nothing when the bibliography lists no DOI', async() => {
+    const lookup = jest.fn();
+
+    await expect(findPdfByDoi(publication(), [{ name: 'X', lookup }])).resolves.toBe('');
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it('reports nothing when the source knows the work but no open access copy', async() => {
+    await expect(findPdfByDoi(publication({ doi: '10.1000/x' }), [ source('OpenAlex', PUBLISHED) ])).resolves.toBe('');
+  });
+
+  it('falls through to the next source when one is unreachable', async() => {
+    const onSourceError = jest.fn();
+    const sources = [ failingSource('OpenAlex'), source('Crossref', OPEN_ACCESS) ];
+
+    await expect(findPdfByDoi(publication({ doi: '10.1000/x' }), sources, undefined, onSourceError))
+      .resolves.toBe('https://oa.org/x.pdf');
+    expect(onSourceError).toHaveBeenCalledWith('OpenAlex');
   });
 });
